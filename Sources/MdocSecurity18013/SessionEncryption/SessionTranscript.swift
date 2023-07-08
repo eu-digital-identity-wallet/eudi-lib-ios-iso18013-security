@@ -6,7 +6,7 @@ import MdocDataModel18013
 import SwiftCBOR
 
 // SessionTranscript = [DeviceEngagementBytes,EReaderKeyBytes,Handover]
-public struct SessionTranscript {
+struct SessionTranscript {
 	/// device engagement bytes (NOT tagged)
 	let devEngBytes: [UInt8]
 	/// reader key bytes ( NOT tagged)
@@ -15,8 +15,17 @@ public struct SessionTranscript {
 	let handOver: CBOR
 }
 
+extension SessionTranscript: CBORDecodable {
+	init?(cbor: CBOR) {
+		guard case let .array(arr) = cbor, arr.count == 3 else { return nil }
+		guard let d = arr[0].decodeTaggedBytes() else { return nil }
+		guard let e = arr[1].decodeTaggedBytes() else { return nil }
+		devEngBytes = d; eReaderKeyBytes = e; handOver = arr[2] 
+	}
+}
+
 extension SessionTranscript: CBOREncodable {
-	public func toCBOR(options: CBOROptions) -> CBOR {
+	func toCBOR(options: CBOROptions) -> CBOR {
 		return .array([.byteString(devEngBytes).taggedEncoded, .byteString(eReaderKeyBytes).taggedEncoded, handOver])
 	}
 }
