@@ -27,7 +27,7 @@ extension MdocSecurity18013Tests {
 
 		static let ephDeviceKey = CoseKeyPrivate(x: "5a88d182bce5f42efa59943f33359d2e8a968ff289d93e5fa444b624343167fe".toBytes()!, y:"b16e8cf858ddc7690407ba61d4c338237a8cfcf3de6aa672fc60a557aa32fc67".toBytes()!, d:"c1917a1579949a042f1ba9fc53a2df9b1bc47adf31c10f813ed75702d1c1f136".toBytes()!)
 	static let ephReaderKey = CoseKeyPrivate(x: "60e3392385041f51403051f2415531cb56dd3f999c71687013aac6768bc8187e".toBytes()!, y:"e58deb8fdbe907f7dd5368245551a34796f7d2215c440c339bb0f7b67beccdfa".toBytes()!, d:"de3b4b9e5f72dd9b58406ae3091434da48a6f9fd010d88fcb0958e2cebec947c".toBytes()!)
-
+	static let deviceKey = CoseKeyPrivate(x: "96313d6c63e24e3372742bfdb1a33ba2c897dcd68ab8c753e4fbd48dca6b7f9a".toBytes()!, y: "1fb3269edd418857de1b39a4e4a44b92fa484caa722c228288f01d0c03a2c3d6".toBytes()!, d: "6ed542ad4783f0b18c833fadf2171273a35d969c581691ef704359cc7cf1e8c0".toBytes()!) 
 
     }
     

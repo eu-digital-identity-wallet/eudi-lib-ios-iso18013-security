@@ -13,6 +13,7 @@ public struct SessionEncryption {
 	var encryptionIdentifier: [UInt8] { sessionRole == .reader ? Self.IDENTIFIER0 : Self.IDENTIFIER1 }
 	var decryptionIdentifier: [UInt8] { sessionRole == .reader ? Self.IDENTIFIER1 : Self.IDENTIFIER0 }
 	let privateKey: CoseKeyPrivate
+	let deviceKey: CoseKeyPrivate
 	let otherKey: CoseKey
 	var deviceEngagementRawData: [UInt8]
 	let eReaderKeyRawData: [UInt8]
@@ -20,14 +21,16 @@ public struct SessionEncryption {
 	
 	/// Initialization of session encryption for the mDL
 	/// - Parameters:
+	///   - deviceKey: static device key
 	///   - se: session establishment data from the mDL reader
 	///   - de: device engagement created by the mDL
 	///   - handOver: handover object according to the transfer protocol
-	init?(se: SessionEstablishment, de: DeviceEngagement, handOver: CBOR) {
+	init?(deviceKey: CoseKeyPrivate, se: SessionEstablishment, de: DeviceEngagement, handOver: CBOR) {
 		sessionRole = .mdoc
 		deviceEngagementRawData = de.encode(options: CBOROptions())
 		guard let pk = de.privateKey else { logger.error("Device engagement for mDL must have the private key"); return nil}
 		privateKey = pk
+		self.deviceKey = deviceKey
 		self.eReaderKeyRawData = se.eReaderKeyRawData
 		guard let ok = se.eReaderKey  else { logger.error("Could not decode ereader key"); return nil}
 		self.otherKey = ok
@@ -56,8 +59,8 @@ public struct SessionEncryption {
 	
 	/// encrypt data using current nonce as described in 9.1.1.5 Cryptographic operations
 	mutating func encrypt(_ data: [UInt8]) throws -> [UInt8]? {
-		let nonce = try makeNonce(sessionCounter, isEncrypt: true) 
-		guard let symmetricKeyForEncrypt = try makeKeyAgreementAndDeriveKey(saltTranscript: sessionTranscriptBytes, isEncrypt: true) else { return nil }
+		let nonce = try makeNonce(sessionCounter, isEncrypt: true)
+		guard let symmetricKeyForEncrypt = try makeKeyAgreementAndDeriveSessionKey(isEncrypt: true) else { return nil }
 		guard let encryptedContent = try AES.GCM.seal(data, using: symmetricKeyForEncrypt, nonce: nonce).combined else { return nil }
 		if sessionRole == .mdoc { sessionCounter += 1 }
 		return [UInt8](encryptedContent.dropFirst(12))
@@ -65,26 +68,48 @@ public struct SessionEncryption {
 	
 	/// decryptes cipher data using the symmetric key
 	mutating func decrypt(_ ciphertext: [UInt8]) throws -> [UInt8]? {
-		let nonce = try makeNonce(sessionCounter, isEncrypt: false) 
+		let nonce = try makeNonce(sessionCounter, isEncrypt: false)
 		let sealedBox = try AES.GCM.SealedBox(combined: nonce + ciphertext)
-		guard let symmetricKeyForDecrypt = try makeKeyAgreementAndDeriveKey(saltTranscript: sessionTranscriptBytes, isEncrypt: false) else { return nil }
-		let decryptedContent = try AES.GCM.open(sealedBox, using: symmetricKeyForDecrypt) 
+		guard let symmetricKeyForDecrypt = try makeKeyAgreementAndDeriveSessionKey(isEncrypt: false) else { return nil }
+		let decryptedContent = try AES.GCM.open(sealedBox, using: symmetricKeyForDecrypt)
 		return [UInt8](decryptedContent)
 	}
+	var transcript: SessionTranscript { SessionTranscript(devEngRawData: deviceEngagementRawData, eReaderRawData: eReaderKeyRawData, handOver: handOver) }
 	
 	/// SessionTranscript = [DeviceEngagementBytes,EReaderKeyBytes,Handover]
 	public var sessionTranscriptBytes: [UInt8] {
-		let transcript = SessionTranscript(devEngBytes: deviceEngagementRawData, eReaderKeyBytes: eReaderKeyRawData, handOver: handOver)
-		return transcript.encode(options: CBOROptions())
+		return transcript.toCBOR(options: CBOROptions()).taggedEncoded.encode(options: CBOROptions())
 	}
 	
 	func getInfo(isEncrypt: Bool) -> String { isEncrypt ? (sessionRole == .mdoc ? "SKDevice" : "SKReader") : (sessionRole == .mdoc ? "SKReader" : "SKDevice") }
 	
 	/// Session keys are derived using ECKA-DH (Elliptic Curve Key Agreement Algorithm – Diffie-Hellman) as defined in BSI TR-03111
-	func makeKeyAgreementAndDeriveKey(saltTranscript: [UInt8], isEncrypt: Bool) throws -> SymmetricKey?  {
-		guard let sharedKey = otherKey.makeEckaDHAgreement(with: privateKey.getx963Representation()) else { logger.error("Error in ECKA key agreement"); return nil} //.x963Representation)
-		let symmetricKey = try Self.HMACKeyDerivationFunction(sharedSecret: sharedKey, salt: saltTranscript, info: getInfo(isEncrypt: isEncrypt).data(using: .utf8)!)
+	func makeKeyAgreementAndDeriveSessionKey(isEncrypt: Bool) throws -> SymmetricKey?  {
+		guard let sharedKey = otherKey.makeEckaDHAgreement(with: privateKey.getx963Representation()) else { logger.error("Error in ECKA session key agreement"); return nil} //.x963Representation)
+		let symmetricKey = try Self.HMACKeyDerivationFunction(sharedSecret: sharedKey, salt: sessionTranscriptBytes, info: getInfo(isEncrypt: isEncrypt).data(using: .utf8)!)
 		return symmetricKey
 	}
+	
+	func makeMACKeyAggrementAndDeriveKey(deviceAuth: DeviceAuthentication) throws -> SymmetricKey? {
+		guard let sharedKey = otherKey.makeEckaDHAgreement(with: deviceKey.getx963Representation()) else { logger.error("Error in ECKA key MAC agreement"); return nil} //.x963Representation)
+		let symmetricKey = try Self.HMACKeyDerivationFunction(sharedSecret: sharedKey, salt: sessionTranscriptBytes, info: "EMacKey".data(using: .utf8)!)
+		return symmetricKey
+	}
+	
+	func getDeviceAuthForTransfer(docType: String, deviceNameSpacesRawData: [UInt8]) throws -> DeviceAuth? {
+		let da = DeviceAuthentication(sessionTranscript: transcript, docType: docType, deviceNameSpacesRawData: deviceNameSpacesRawData)
+		let contentBytes = da.toCBOR(options: CBOROptions()).taggedEncoded.encode(options: CBOROptions())
+		let bUseMac = UserDefaults.standard.bool(forKey: "PreferMacAuth")
+		let coseRes: Cose
+		if bUseMac {
+			// this is the preferred method
+			guard let symmetricKey = try self.makeMACKeyAggrementAndDeriveKey(deviceAuth: da) else { return nil}
+			coseRes = makeDetachedCoseMac0(payloadData: Data(contentBytes), key: symmetricKey, alg: .hmac256)
+		} else {
+			coseRes = makeDetachedCoseSign1(payloadData: Data(contentBytes), alg: .es256)
+		}
+		return DeviceAuth(cose: coseRes)
+	}
+	
 }
 

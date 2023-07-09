@@ -39,10 +39,10 @@ final class MdocSecurity18013Tests: XCTestCase {
         let transcript = try XCTUnwrap(SessionTranscript(cbor: st))
         let dse = try XCTUnwrap(try CBOR.decode([UInt8](Self.AnnexdTestData.d51_sessionEstablishData)))
         let se: SessionEstablishment = try XCTUnwrap(SessionEstablishment(cbor: dse))
-        var de = try XCTUnwrap(DeviceEngagement(data: transcript.devEngBytes))
+        var de = try XCTUnwrap(DeviceEngagement(data: transcript.devEngRawData))
         de.setD(d: Self.AnnexdTestData.ephDeviceKey.d)
-        var sessionEncr = try XCTUnwrap(SessionEncryption(se: se, de: de, handOver: transcript.handOver))
-		sessionEncr.deviceEngagementRawData = transcript.devEngBytes // cbor encoding differs between implemenentations
+        var sessionEncr = try XCTUnwrap(SessionEncryption(deviceKey: AnnexdTestData.deviceKey, se: se, de: de, handOver: transcript.handOver))
+		sessionEncr.deviceEngagementRawData = transcript.devEngRawData // cbor encoding differs between implemenentations
 		XCTAssertEqual(Self.AnnexdTestData.d51_sessionTranscriptData, Data(sessionEncr.sessionTranscriptBytes))
         let data = try XCTUnwrap(try sessionEncr.decrypt(se.data))
         let cbor = try XCTUnwrap(try CBOR.decode(data))
