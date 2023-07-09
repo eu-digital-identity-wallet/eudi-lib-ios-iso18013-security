@@ -5,7 +5,7 @@ import Foundation
 import MdocDataModel18013
 import SwiftCBOR
 
-// SessionTranscript = [DeviceEngagementBytes,EReaderKeyBytes,Handover]
+/// SessionTranscript = [DeviceEngagementBytes,EReaderKeyBytes,Handover]
 struct SessionTranscript {
 	/// device engagement bytes (NOT tagged)
 	let devEngBytes: [UInt8]

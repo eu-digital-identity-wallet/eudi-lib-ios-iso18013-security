@@ -3,6 +3,7 @@ import MdocDataModel18013
 import SwiftCBOR
 import Logging
 
+/// Message data transfered between mDL and mDL reader
 public struct SessionData {
 	let data: [UInt8]?
 	let status: UInt64?

@@ -5,6 +5,8 @@ import SwiftCBOR
 import Logging
 import MdocDataModel18013
 
+/// The mdoc reader creates the session establishment message.Contains the reader key and the encrypted mdoc request.
+/// The mdoc uses the data from the session establishment message to derive the session keys and decrypt the mdoc request.
 struct SessionEstablishment {
 	let eReaderKeyRawData: [UInt8]
 	let data: [UInt8]
