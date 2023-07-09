@@ -1,5 +1,6 @@
 import XCTest
 import SwiftCBOR
+@testable import MdocDataModel18013
 @testable import MdocSecurity18013
 
 final class MdocSecurity18013Tests: XCTestCase {
@@ -29,5 +30,22 @@ final class MdocSecurity18013Tests: XCTestCase {
         let sd = try XCTUnwrap(SessionData(cbor: d))
         XCTAssertNil(sd.data)
         XCTAssertNotNil(sd.status)
+    }
+
+    func test_decrypt_session_establishment_annex_d51() throws {
+        let d = try XCTUnwrap(try CBOR.decode([UInt8](Self.AnnexdTestData.d51_sessionTranscriptData)))
+		guard case let .tagged(t, v) = d, t == .encodedCBORDataItem, case let .byteString(bs) = v, let st = try CBOR.decode(bs) else {
+             XCTFail("Not a tagged cbor"); return }
+        let transcript = try XCTUnwrap(SessionTranscript(cbor: st))
+        let dse = try XCTUnwrap(try CBOR.decode([UInt8](Self.AnnexdTestData.d51_sessionEstablishData)))
+        let se: SessionEstablishment = try XCTUnwrap(SessionEstablishment(cbor: dse))
+        var de = try XCTUnwrap(DeviceEngagement(data: transcript.devEngBytes))
+        de.setD(d: Self.AnnexdTestData.ephDeviceKey.d)
+        var sessionEncr = try XCTUnwrap(SessionEncryption(se: se, de: de, handOver: transcript.handOver))
+		sessionEncr.deviceEngagementRawData = transcript.devEngBytes // cbor encoding differs between implemenentations
+		XCTAssertEqual(Self.AnnexdTestData.d51_sessionTranscriptData, Data(sessionEncr.sessionTranscriptBytes))
+        let data = try XCTUnwrap(try sessionEncr.decrypt(se.data))
+        let cbor = try XCTUnwrap(try CBOR.decode(data))
+        print("Decrypted request:\n", cbor)
     }
 }

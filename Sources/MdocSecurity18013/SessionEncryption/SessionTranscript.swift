@@ -15,6 +15,8 @@ struct SessionTranscript {
 	let handOver: CBOR
 }
 
+#if DEBUG
+// initializer used for tests only
 extension SessionTranscript: CBORDecodable {
 	init?(cbor: CBOR) {
 		guard case let .array(arr) = cbor, arr.count == 3 else { return nil }
@@ -23,9 +25,10 @@ extension SessionTranscript: CBORDecodable {
 		devEngBytes = d; eReaderKeyBytes = e; handOver = arr[2] 
 	}
 }
+#endif
 
 extension SessionTranscript: CBOREncodable {
 	func toCBOR(options: CBOROptions) -> CBOR {
-		return .array([.byteString(devEngBytes).taggedEncoded, .byteString(eReaderKeyBytes).taggedEncoded, handOver])
+		return .array([devEngBytes.taggedEncoded, eReaderKeyBytes.taggedEncoded, handOver]).taggedEncoded
 	}
 }
