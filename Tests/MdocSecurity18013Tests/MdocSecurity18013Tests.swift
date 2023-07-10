@@ -32,20 +32,43 @@ final class MdocSecurity18013Tests: XCTestCase {
         XCTAssertNotNil(sd.status)
     }
 
-    func test_decrypt_session_establishment_annex_d51() throws {
+    func make_session_encryption_from_annex_data() throws -> (SessionEstablishment,SessionEncryption)? {
         let d = try XCTUnwrap(try CBOR.decode([UInt8](Self.AnnexdTestData.d51_sessionTranscriptData)))
 		guard case let .tagged(t, v) = d, t == .encodedCBORDataItem, case let .byteString(bs) = v, let st = try CBOR.decode(bs) else {
-             XCTFail("Not a tagged cbor"); return }
+             XCTFail("Not a tagged cbor"); return nil }
         let transcript = try XCTUnwrap(SessionTranscript(cbor: st))
         let dse = try XCTUnwrap(try CBOR.decode([UInt8](Self.AnnexdTestData.d51_sessionEstablishData)))
         let se: SessionEstablishment = try XCTUnwrap(SessionEstablishment(cbor: dse))
         var de = try XCTUnwrap(DeviceEngagement(data: transcript.devEngRawData))
-        de.setD(d: Self.AnnexdTestData.ephDeviceKey.d)
-        var sessionEncr = try XCTUnwrap(SessionEncryption(deviceKey: AnnexdTestData.deviceKey, se: se, de: de, handOver: transcript.handOver))
-		sessionEncr.deviceEngagementRawData = transcript.devEngRawData // cbor encoding differs between implemenentations
-		XCTAssertEqual(Self.AnnexdTestData.d51_sessionTranscriptData, Data(sessionEncr.sessionTranscriptBytes))
+        de.setD(d: Self.AnnexdTestData.d51_ephDeviceKey.d)
+        var sessionEncr = try XCTUnwrap(SessionEncryption(deviceKey: AnnexdTestData.d53_deviceKey, se: se, de: de, handOver: transcript.handOver))
+		sessionEncr.deviceEngagementRawData = transcript.devEngRawData // cbor encoding differs between implemenentations, for mDL with our own implementation they will be identical
+        return (se, sessionEncr)
+    }
+     
+      func test_decrypt_session_establishment_annex_d51() throws {
+        var (se,sessionEncr) = try XCTUnwrap(make_session_encryption_from_annex_data())
+ 		XCTAssertEqual(Self.AnnexdTestData.d51_sessionTranscriptData, Data(sessionEncr.sessionTranscriptBytes))
         let data = try XCTUnwrap(try sessionEncr.decrypt(se.data))
         let cbor = try XCTUnwrap(try CBOR.decode(data))
         print("Decrypted request:\n", cbor)
+    }
+
+    func test_compute_DeviceAuthenticationBytes_and_MacStructure_annex_d53() throws {
+        let (_,sessionEncr) = try XCTUnwrap(make_session_encryption_from_annex_data())
+        let mdocAuth = MdocAuthentication(transcript: sessionEncr.transcript, otherKey: Self.AnnexdTestData.d51_ephReaderKey.key, deviceKey: Self.AnnexdTestData.d53_deviceKey)
+        let da = DeviceAuthentication(sessionTranscript: mdocAuth.transcript, docType: "org.iso.18013.5.1.mDL", deviceNameSpacesRawData: [0xA0])
+        XCTAssertEqual(Data(da.toCBOR(options: CBOROptions()).taggedEncoded.encode(options: CBOROptions())), AnnexdTestData.d53_deviceAuthDeviceAuthenticationBytes)
+        let coseIn = Cose(type: .mac0, algorithm: Cose.MacAlgorithm.hmac256.rawValue, payloadData: AnnexdTestData.d53_deviceAuthDeviceAuthenticationBytes)
+		let dataToSign = try XCTUnwrap(coseIn.signatureStruct)
+        XCTAssertEqual(dataToSign, AnnexdTestData.d53_deviceAuthMacStructure)
+    }
+
+    func test_compute_deviceAuth_CBOR_data() throws {
+        let (_,sessionEncr) = try XCTUnwrap(make_session_encryption_from_annex_data())
+        let mdocAuth = MdocAuthentication(transcript: sessionEncr.transcript, otherKey: Self.AnnexdTestData.d51_ephReaderKey.key, deviceKey: Self.AnnexdTestData.d53_deviceKey)
+        let deviceAuth = try XCTUnwrap(try mdocAuth.getDeviceAuthForTransfer(docType: "org.iso.18013.5.1.mDL", deviceNameSpacesRawData: [0xA0]))
+        let ourDeviceAuthCBORbytes = deviceAuth.encode(options: CBOROptions())
+        XCTAssertEqual(Data(ourDeviceAuthCBORbytes), AnnexdTestData.d53_deviceAuthCBORdata)
     }
 }

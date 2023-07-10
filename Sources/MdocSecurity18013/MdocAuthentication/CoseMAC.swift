@@ -2,16 +2,16 @@ import Foundation
 import CryptoKit
 import MdocDataModel18013
 
-extension SessionEncryption {
+extension Cose {
 	
-	public func makeDetachedCoseMac0(payloadData: Data, key: SymmetricKey, alg: Cose.MacAlgorithm) -> Cose {
+	public static func makeDetachedCoseMac0(payloadData: Data, key: SymmetricKey, alg: Cose.MacAlgorithm) -> Cose {
 		let coseIn = Cose(type: .mac0, algorithm: alg.rawValue, payloadData: payloadData)
 		let dataToSign = coseIn.signatureStruct!
 		// return COSE_MAC0 struct
 		return Cose(type: .mac0, algorithm: alg.rawValue, signature: computeMACValue(dataToSign, key: key, alg: alg))
 	}
 	
-	public func computeMACValue(_ dataToAuthenticate: Data, key: SymmetricKey, alg: Cose.MacAlgorithm) -> Data {
+	public static func computeMACValue(_ dataToAuthenticate: Data, key: SymmetricKey, alg: Cose.MacAlgorithm) -> Data {
 		let mac0Value: Data
 		switch alg {
 		case .hmac256:

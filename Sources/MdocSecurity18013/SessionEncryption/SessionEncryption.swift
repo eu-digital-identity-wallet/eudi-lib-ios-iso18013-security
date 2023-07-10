@@ -77,9 +77,7 @@ public struct SessionEncryption {
 	var transcript: SessionTranscript { SessionTranscript(devEngRawData: deviceEngagementRawData, eReaderRawData: eReaderKeyRawData, handOver: handOver) }
 	
 	/// SessionTranscript = [DeviceEngagementBytes,EReaderKeyBytes,Handover]
-	public var sessionTranscriptBytes: [UInt8] {
-		return transcript.toCBOR(options: CBOROptions()).taggedEncoded.encode(options: CBOROptions())
-	}
+	public var sessionTranscriptBytes: [UInt8] { transcript.toCBOR(options: CBOROptions()).taggedEncoded.encode(options: CBOROptions()) }
 	
 	func getInfo(isEncrypt: Bool) -> String { isEncrypt ? (sessionRole == .mdoc ? "SKDevice" : "SKReader") : (sessionRole == .mdoc ? "SKReader" : "SKDevice") }
 	
@@ -89,27 +87,7 @@ public struct SessionEncryption {
 		let symmetricKey = try Self.HMACKeyDerivationFunction(sharedSecret: sharedKey, salt: sessionTranscriptBytes, info: getInfo(isEncrypt: isEncrypt).data(using: .utf8)!)
 		return symmetricKey
 	}
-	
-	func makeMACKeyAggrementAndDeriveKey(deviceAuth: DeviceAuthentication) throws -> SymmetricKey? {
-		guard let sharedKey = otherKey.makeEckaDHAgreement(with: deviceKey.getx963Representation()) else { logger.error("Error in ECKA key MAC agreement"); return nil} //.x963Representation)
-		let symmetricKey = try Self.HMACKeyDerivationFunction(sharedSecret: sharedKey, salt: sessionTranscriptBytes, info: "EMacKey".data(using: .utf8)!)
-		return symmetricKey
-	}
-	
-	func getDeviceAuthForTransfer(docType: String, deviceNameSpacesRawData: [UInt8]) throws -> DeviceAuth? {
-		let da = DeviceAuthentication(sessionTranscript: transcript, docType: docType, deviceNameSpacesRawData: deviceNameSpacesRawData)
-		let contentBytes = da.toCBOR(options: CBOROptions()).taggedEncoded.encode(options: CBOROptions())
-		let bUseMac = UserDefaults.standard.bool(forKey: "PreferMacAuth")
-		let coseRes: Cose
-		if bUseMac {
-			// this is the preferred method
-			guard let symmetricKey = try self.makeMACKeyAggrementAndDeriveKey(deviceAuth: da) else { return nil}
-			coseRes = makeDetachedCoseMac0(payloadData: Data(contentBytes), key: symmetricKey, alg: .hmac256)
-		} else {
-			coseRes = makeDetachedCoseSign1(payloadData: Data(contentBytes), alg: .es256)
-		}
-		return DeviceAuth(cose: coseRes)
-	}
+
 	
 }
 
