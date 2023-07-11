@@ -71,4 +71,15 @@ final class MdocSecurity18013Tests: XCTestCase {
         let ourDeviceAuthCBORbytes = deviceAuth.encode(options: CBOROptions())
         XCTAssertEqual(Data(ourDeviceAuthCBORbytes), AnnexdTestData.d53_deviceAuthCBORdata)
     }
+
+    func test_validate_readerAuth_CBOR_data() throws {
+        let (_,sessionEncr) = try XCTUnwrap(make_session_encryption_from_annex_data())
+        	let dr = try XCTUnwrap(DeviceRequest(data: AnnexdTestData.request_d411.bytes))
+            for docR in dr.docRequests {
+            let mdocAuth = MdocReaderAuthentication(transcript: sessionEncr.transcript)
+            guard let readerAuthRawCBOR = docR.readerAuthRawCBOR else { continue }
+            let b = try mdocAuth.validateReaderAuth(readerAuthCBOR: readerAuthRawCBOR, readerAuthCertificate: docR.readerCertificate!, itemsRequestRawData: docR.itemsRequestRawData!)
+            XCTAssertTrue(b, "Reader auth not validated")
+            }
+    }
 }

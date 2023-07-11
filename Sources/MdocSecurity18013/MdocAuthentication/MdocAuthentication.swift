@@ -16,13 +16,13 @@ struct MdocAuthentication {
 		return symmetricKey
 	}
 	
-	func getDeviceAuthForTransfer(docType: String, deviceNameSpacesRawData: [UInt8]) throws -> DeviceAuth? {
+	public func getDeviceAuthForTransfer(docType: String, deviceNameSpacesRawData: [UInt8]) throws -> DeviceAuth? {
 		let da = DeviceAuthentication(sessionTranscript: transcript, docType: docType, deviceNameSpacesRawData: deviceNameSpacesRawData)
 		let contentBytes = da.toCBOR(options: CBOROptions()).taggedEncoded.encode(options: CBOROptions())
 		let bUseDeviceSign = UserDefaults.standard.bool(forKey: "PreferDeviceSignature")
 		let coseRes: Cose
 		if bUseDeviceSign {
-			coseRes = Cose.makeDetachedCoseSign1(payloadData: Data(contentBytes), deviceKey: deviceKey, alg: .es256)
+			coseRes = try Cose.makeDetachedCoseSign1(payloadData: Data(contentBytes), deviceKey: deviceKey, alg: .es256)
 		} else {
             // this is the preferred method
             guard let symmetricKey = try self.makeMACKeyAggrementAndDeriveKey(deviceAuth: da) else { return nil}
