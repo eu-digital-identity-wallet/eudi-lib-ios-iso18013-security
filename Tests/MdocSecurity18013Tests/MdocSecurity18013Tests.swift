@@ -1,9 +1,11 @@
 import XCTest
 import SwiftCBOR
+
 @testable import MdocDataModel18013
 @testable import MdocSecurity18013
 
 final class MdocSecurity18013Tests: XCTestCase {
+
     func test_decode_session_transcript_annex_d51() throws {
         let d = try XCTUnwrap(try CBOR.decode([UInt8](Self.AnnexdTestData.d51_sessionTranscriptData)))
         guard case let .tagged(_, v) = d, case let .byteString(bs) = v, let st = try CBOR.decode(bs) else {
@@ -56,7 +58,8 @@ final class MdocSecurity18013Tests: XCTestCase {
 
     func test_compute_DeviceAuthenticationBytes_and_MacStructure_annex_d53() throws {
         let (_,sessionEncr) = try XCTUnwrap(make_session_encryption_from_annex_data())
-        let mdocAuth = MdocAuthentication(transcript: sessionEncr.transcript, otherKey: Self.AnnexdTestData.d51_ephReaderKey.key, deviceKey: Self.AnnexdTestData.d53_deviceKey)
+        let authKeys = CoseKeyExchange(publicKey: Self.AnnexdTestData.d51_ephReaderKey.key, privateKey: Self.AnnexdTestData.d53_deviceKey)
+        let mdocAuth = MdocAuthentication(transcript: sessionEncr.transcript, authKeys: authKeys)
         let da = DeviceAuthentication(sessionTranscript: mdocAuth.transcript, docType: "org.iso.18013.5.1.mDL", deviceNameSpacesRawData: [0xA0])
         XCTAssertEqual(Data(da.toCBOR(options: CBOROptions()).taggedEncoded.encode(options: CBOROptions())), AnnexdTestData.d53_deviceAuthDeviceAuthenticationBytes)
         let coseIn = Cose(type: .mac0, algorithm: Cose.MacAlgorithm.hmac256.rawValue, payloadData: AnnexdTestData.d53_deviceAuthDeviceAuthenticationBytes)
@@ -66,20 +69,22 @@ final class MdocSecurity18013Tests: XCTestCase {
 
     func test_compute_deviceAuth_CBOR_data() throws {
         let (_,sessionEncr) = try XCTUnwrap(make_session_encryption_from_annex_data())
-        let mdocAuth = MdocAuthentication(transcript: sessionEncr.transcript, otherKey: Self.AnnexdTestData.d51_ephReaderKey.key, deviceKey: Self.AnnexdTestData.d53_deviceKey)
-        let deviceAuth = try XCTUnwrap(try mdocAuth.getDeviceAuthForTransfer(docType: "org.iso.18013.5.1.mDL", deviceNameSpacesRawData: [0xA0]))
+        let authKeys = CoseKeyExchange(publicKey: Self.AnnexdTestData.d51_ephReaderKey.key, privateKey: Self.AnnexdTestData.d53_deviceKey)
+        let mdocAuth = MdocAuthentication(transcript: sessionEncr.transcript, authKeys: authKeys)
+		let bUseDeviceSign = UserDefaults.standard.bool(forKey: "PreferDeviceSignature")
+		let deviceAuth = try XCTUnwrap(try mdocAuth.getDeviceAuthForTransfer(docType: "org.iso.18013.5.1.mDL", deviceNameSpacesRawData: [0xA0], bUseDeviceSign: bUseDeviceSign))
         let ourDeviceAuthCBORbytes = deviceAuth.encode(options: CBOROptions())
         XCTAssertEqual(Data(ourDeviceAuthCBORbytes), AnnexdTestData.d53_deviceAuthCBORdata)
     }
 
-    func test_validate_readerAuth_CBOR_data() throws {
-        let (_,sessionEncr) = try XCTUnwrap(make_session_encryption_from_annex_data())
-        	let dr = try XCTUnwrap(DeviceRequest(data: AnnexdTestData.request_d411.bytes))
-            for docR in dr.docRequests {
-            let mdocAuth = MdocReaderAuthentication(transcript: sessionEncr.transcript)
-            guard let readerAuthRawCBOR = docR.readerAuthRawCBOR else { continue }
-            let b = try mdocAuth.validateReaderAuth(readerAuthCBOR: readerAuthRawCBOR, readerAuthCertificate: docR.readerCertificate!, itemsRequestRawData: docR.itemsRequestRawData!)
-            XCTAssertTrue(b, "Reader auth not validated")
-            }
-    }
+	func test_validate_readerAuth_CBOR_data() throws {
+		let (_,sessionEncr) = try XCTUnwrap(make_session_encryption_from_annex_data())
+		let dr = try XCTUnwrap(DeviceRequest(data: AnnexdTestData.request_d411.bytes))
+		for docR in dr.docRequests {
+			let mdocAuth = MdocReaderAuthentication(transcript: sessionEncr.transcript)
+			guard let readerAuthRawCBOR = docR.readerAuthRawCBOR else { continue }
+			let b = try mdocAuth.validateReaderAuth(readerAuthCBOR: readerAuthRawCBOR, readerAuthCertificate: docR.readerCertificate!, itemsRequestRawData: docR.itemsRequestRawData!)
+			XCTAssertTrue(b, "Reader auth not validated")
+		}
+	}
 }

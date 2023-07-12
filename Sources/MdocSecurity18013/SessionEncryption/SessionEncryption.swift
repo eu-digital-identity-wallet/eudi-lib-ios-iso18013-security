@@ -12,9 +12,7 @@ public struct SessionEncryption {
 	static let IDENTIFIER1: [UInt8] = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01]
 	var encryptionIdentifier: [UInt8] { sessionRole == .reader ? Self.IDENTIFIER0 : Self.IDENTIFIER1 }
 	var decryptionIdentifier: [UInt8] { sessionRole == .reader ? Self.IDENTIFIER1 : Self.IDENTIFIER0 }
-	let privateKey: CoseKeyPrivate
-	let deviceKey: CoseKeyPrivate
-	let otherKey: CoseKey
+	let sessionKeys: CoseKeyExchange
 	var deviceEngagementRawData: [UInt8]
 	let eReaderKeyRawData: [UInt8]
 	let handOver: CBOR
@@ -29,11 +27,9 @@ public struct SessionEncryption {
 		sessionRole = .mdoc
 		deviceEngagementRawData = de.encode(options: CBOROptions())
 		guard let pk = de.privateKey else { logger.error("Device engagement for mDL must have the private key"); return nil}
-		privateKey = pk
-		self.deviceKey = deviceKey
 		self.eReaderKeyRawData = se.eReaderKeyRawData
 		guard let ok = se.eReaderKey  else { logger.error("Could not decode ereader key"); return nil}
-		self.otherKey = ok
+		sessionKeys = CoseKeyExchange(publicKey: ok, privateKey: pk)
 		self.handOver = handOver
 	}
 	
@@ -83,7 +79,7 @@ public struct SessionEncryption {
 	
 	/// Session keys are derived using ECKA-DH (Elliptic Curve Key Agreement Algorithm – Diffie-Hellman) as defined in BSI TR-03111
 	func makeKeyAgreementAndDeriveSessionKey(isEncrypt: Bool) throws -> SymmetricKey?  {
-		guard let sharedKey = otherKey.makeEckaDHAgreement(with: privateKey.getx963Representation()) else { logger.error("Error in ECKA session key agreement"); return nil} //.x963Representation)
+		guard let sharedKey = sessionKeys.makeEckaDHAgreement() else { logger.error("Error in ECKA session key agreement"); return nil} //.x963Representation)
 		let symmetricKey = try Self.HMACKeyDerivationFunction(sharedSecret: sharedKey, salt: sessionTranscriptBytes, info: getInfo(isEncrypt: isEncrypt).data(using: .utf8)!)
 		return symmetricKey
 	}
