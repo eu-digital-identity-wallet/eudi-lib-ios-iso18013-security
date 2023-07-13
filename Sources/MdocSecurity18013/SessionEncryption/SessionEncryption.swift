@@ -23,7 +23,7 @@ public struct SessionEncryption {
 	///   - se: session establishment data from the mDL reader
 	///   - de: device engagement created by the mDL
 	///   - handOver: handover object according to the transfer protocol
-	init?(deviceKey: CoseKeyPrivate, se: SessionEstablishment, de: DeviceEngagement, handOver: CBOR) {
+	init?(se: SessionEstablishment, de: DeviceEngagement, handOver: CBOR) {
 		sessionRole = .mdoc
 		deviceEngagementRawData = de.encode(options: CBOROptions())
 		guard let pk = de.privateKey else { logger.error("Device engagement for mDL must have the private key"); return nil}
