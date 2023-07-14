@@ -4,6 +4,12 @@ import MdocDataModel18013
 import SwiftCBOR
 
 /// Session encryption uses standard ephemeral key ECDH to establish session keys for authenticated symmetric encryption.
+/// The ``SessionEncryption`` struct implements session encryption (for the mDoc currently)
+/// It is initialized from a) the session establishment data received from the mdoc reader, b) the device engagement data generated from the mdoc and c) the handover data.
+/// 
+/// ```swift
+/// var se = SessionEncryption(se: sessionEstablishmentObject, de: deviceEngagementObject, handOver: handOverObject)
+/// ```
 public struct SessionEncryption {
 	let sessionRole: SessionRole
 	public var sessionCounter: UInt32 = 1
@@ -17,16 +23,15 @@ public struct SessionEncryption {
 	let eReaderKeyRawData: [UInt8]
 	let handOver: CBOR
 	
-	/// Initialization of session encryption for the mDL
+	/// Initialization of session encryption for the mdoc
 	/// - Parameters:
-	///   - deviceKey: static device key
-	///   - se: session establishment data from the mDL reader
-	///   - de: device engagement created by the mDL
+	///   - se: session establishment data from the mdoc reader
+	///   - de: device engagement created by the mdoc
 	///   - handOver: handover object according to the transfer protocol
 	init?(se: SessionEstablishment, de: DeviceEngagement, handOver: CBOR) {
 		sessionRole = .mdoc
 		deviceEngagementRawData = de.encode(options: CBOROptions())
-		guard let pk = de.privateKey else { logger.error("Device engagement for mDL must have the private key"); return nil}
+		guard let pk = de.privateKey else { logger.error("Device engagement for mdoc must have the private key"); return nil}
 		self.eReaderKeyRawData = se.eReaderKeyRawData
 		guard let ok = se.eReaderKey  else { logger.error("Could not decode ereader key"); return nil}
 		sessionKeys = CoseKeyExchange(publicKey: ok, privateKey: pk)
@@ -48,6 +53,7 @@ public struct SessionEncryption {
 		return nonce
 	}
 	
+	/// computation of HKDF symmetric key 
 	static func HMACKeyDerivationFunction(sharedSecret: SharedSecret, salt: [UInt8], info: Data) throws -> SymmetricKey {
 		let symmetricKey = sharedSecret.hkdfDerivedSymmetricKey(using: SHA256.self, salt: salt, sharedInfo: info, outputByteCount: 32)
 		return symmetricKey
