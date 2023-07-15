@@ -60,7 +60,7 @@ public struct SessionEncryption {
 	}
 	
 	/// encrypt data using current nonce as described in 9.1.1.5 Cryptographic operations
-	mutating func encrypt(_ data: [UInt8]) throws -> [UInt8]? {
+	mutating public func encrypt(_ data: [UInt8]) throws -> [UInt8]? {
 		let nonce = try makeNonce(sessionCounter, isEncrypt: true)
 		guard let symmetricKeyForEncrypt = try makeKeyAgreementAndDeriveSessionKey(isEncrypt: true) else { return nil }
 		guard let encryptedContent = try AES.GCM.seal(data, using: symmetricKeyForEncrypt, nonce: nonce).combined else { return nil }
@@ -69,7 +69,7 @@ public struct SessionEncryption {
 	}
 	
 	/// decryptes cipher data using the symmetric key
-	mutating func decrypt(_ ciphertext: [UInt8]) throws -> [UInt8]? {
+	mutating public func decrypt(_ ciphertext: [UInt8]) throws -> [UInt8]? {
 		let nonce = try makeNonce(sessionCounter, isEncrypt: false)
 		let sealedBox = try AES.GCM.SealedBox(combined: nonce + ciphertext)
 		guard let symmetricKeyForDecrypt = try makeKeyAgreementAndDeriveSessionKey(isEncrypt: false) else { return nil }
