@@ -8,8 +8,8 @@ import MdocDataModel18013
 /// The mdoc reader creates the session establishment message.Contains the reader key and the encrypted mdoc request.
 /// The mdoc uses the data from the session establishment message to derive the session keys and decrypt the mdoc request.
 public struct SessionEstablishment {
-	let eReaderKeyRawData: [UInt8]
-	let data: [UInt8]
+	public let eReaderKeyRawData: [UInt8]
+	public let data: [UInt8]
 	
 	enum CodingKeys: String, CodingKey {
 		case eReaderKey

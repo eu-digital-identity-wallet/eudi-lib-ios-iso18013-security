@@ -6,8 +6,8 @@ import Logging
 /// Message data transfered between mDL and mDL reader
 public struct SessionData {
 	
-	let data: [UInt8]?
-	let status: UInt64?
+	public let data: [UInt8]?
+	public let status: UInt64?
 	
 	enum CodingKeys: String, CodingKey {
 		case data

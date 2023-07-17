@@ -33,7 +33,7 @@ public struct SessionEncryption {
 		deviceEngagementRawData = de.encode(options: CBOROptions())
 		guard let pk = de.privateKey else { logger.error("Device engagement for mdoc must have the private key"); return nil}
 		self.eReaderKeyRawData = se.eReaderKeyRawData
-		guard let ok = se.eReaderKey  else { logger.error("Could not decode ereader key"); return nil}
+		guard let ok = se.eReaderKey else { logger.error("Could not decode ereader key"); return nil}
 		sessionKeys = CoseKeyExchange(publicKey: ok, privateKey: pk)
 		self.handOver = handOver
 	}
