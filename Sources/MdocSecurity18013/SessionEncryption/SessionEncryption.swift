@@ -30,7 +30,7 @@ public struct SessionEncryption {
 	///   - handOver: handover object according to the transfer protocol
 	public init?(se: SessionEstablishment, de: DeviceEngagement, handOver: CBOR) {
 		sessionRole = .mdoc
-		deviceEngagementRawData = de.encode(options: CBOROptions())
+		deviceEngagementRawData = de.qrCoded ?? de.encode(options: CBOROptions())
 		guard let pk = de.privateKey else { logger.error("Device engagement for mdoc must have the private key"); return nil}
 		self.eReaderKeyRawData = se.eReaderKeyRawData
 		guard let ok = se.eReaderKey else { logger.error("Could not decode ereader key"); return nil}
@@ -79,7 +79,10 @@ public struct SessionEncryption {
 	var transcript: SessionTranscript { SessionTranscript(devEngRawData: deviceEngagementRawData, eReaderRawData: eReaderKeyRawData, handOver: handOver) }
 	
 	/// SessionTranscript = [DeviceEngagementBytes,EReaderKeyBytes,Handover]
-	public var sessionTranscriptBytes: [UInt8] { transcript.toCBOR(options: CBOROptions()).taggedEncoded.encode(options: CBOROptions()) }
+	public var sessionTranscriptBytes: [UInt8] {
+		let trCbor = transcript.taggedEncoded
+		return trCbor.encode(options: CBOROptions())
+	}
 	
 	func getInfo(isEncrypt: Bool) -> String { isEncrypt ? (sessionRole == .mdoc ? "SKDevice" : "SKReader") : (sessionRole == .mdoc ? "SKReader" : "SKDevice") }
 	

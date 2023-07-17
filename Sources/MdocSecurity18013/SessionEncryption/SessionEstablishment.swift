@@ -15,7 +15,6 @@ public struct SessionEstablishment {
 		case eReaderKey
 		case data
 	}
-
 	var eReaderKey: CoseKey? { CoseKey(data: eReaderKeyRawData) }
 }
 
