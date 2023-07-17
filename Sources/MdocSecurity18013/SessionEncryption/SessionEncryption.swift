@@ -76,10 +76,10 @@ public struct SessionEncryption {
 		let decryptedContent = try AES.GCM.open(sealedBox, using: symmetricKeyForDecrypt)
 		return [UInt8](decryptedContent)
 	}
-	var transcript: SessionTranscript { SessionTranscript(devEngRawData: deviceEngagementRawData, eReaderRawData: eReaderKeyRawData, handOver: handOver) }
+	var transcript: SessionTranscript { SessionTranscript(devEngRawData: deviceEngagementRawData.taggedEncoded.encode(options: CBOROptions()), eReaderRawData: eReaderKeyRawData.taggedEncoded.encode(options: CBOROptions()), handOver: handOver) }
 	
 	/// SessionTranscript = [DeviceEngagementBytes,EReaderKeyBytes,Handover]
-	public var sessionTranscriptBytes: [UInt8] { transcript.toCBOR(options: CBOROptions()).taggedEncoded.encode(options: CBOROptions()) }
+	public var sessionTranscriptBytes: [UInt8] { transcript.toCBOR(options: CBOROptions()).encode(options: CBOROptions()) }
 	
 	func getInfo(isEncrypt: Bool) -> String { isEncrypt ? (sessionRole == .mdoc ? "SKDevice" : "SKReader") : (sessionRole == .mdoc ? "SKReader" : "SKDevice") }
 	
