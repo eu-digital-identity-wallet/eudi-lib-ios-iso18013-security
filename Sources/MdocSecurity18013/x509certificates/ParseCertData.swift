@@ -1,4 +1,5 @@
   import Foundation
+  import MdocDataModel18013
   
   public func parseKeyx963(privateKeyData : Data) -> Data? {
     let (result, _) = ASN1.toASN1Element(data: privateKeyData)
@@ -27,5 +28,6 @@
     guard let repr = SecKeyCopyExternalRepresentation(secKey, &error) else { return nil }
     return repr as Data
   }
+
 
   
