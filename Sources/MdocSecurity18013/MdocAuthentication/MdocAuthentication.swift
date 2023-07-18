@@ -12,12 +12,17 @@ import SwiftCBOR
 /// ```swift
 /// let mdocAuth = MdocAuthentication(transcript: sessionEncr.transcript, authKeys: authKeys)
 /// ```
-struct MdocAuthentication {
+public struct MdocAuthentication {
+	
     let transcript: SessionTranscript
     let authKeys: CoseKeyExchange
-
     var sessionTranscriptBytes: [UInt8] { transcript.toCBOR(options: CBOROptions()).taggedEncoded.encode(options: CBOROptions()) }
 	
+	public init(transcript: SessionTranscript, authKeys: CoseKeyExchange) {
+		self.transcript = transcript
+		self.authKeys = authKeys
+	}
+
 	/// Calculate the ephemeral MAC key, by performing ECKA-DH (Elliptic Curve Key Agreement Algorithm – Diffie-Hellman)
 	/// The inputs shall be the SDeviceKey.Priv and EReaderKey.Pub for the mdoc and EReaderKey.Priv and SDeviceKey.Pub for the mdoc reader.
     func makeMACKeyAggrementAndDeriveKey(deviceAuth: DeviceAuthentication) throws -> SymmetricKey? {
@@ -32,7 +37,7 @@ struct MdocAuthentication {
 	///   - deviceNameSpacesRawData: device-name spaces raw data. Usually is a CBOR-encoded empty dictionary
 	///   - bUseDeviceSign: Specify true for device authentication (false is default)
 	/// - Returns: DeviceAuth instance
-	public func getDeviceAuthForTransfer(docType: String, deviceNameSpacesRawData: [UInt8], bUseDeviceSign: Bool = false) throws -> DeviceAuth? {
+	public func getDeviceAuthForTransfer(docType: String, deviceNameSpacesRawData: [UInt8] = [0xA0], bUseDeviceSign: Bool = false) throws -> DeviceAuth? {
 		let da = DeviceAuthentication(sessionTranscript: transcript, docType: docType, deviceNameSpacesRawData: deviceNameSpacesRawData)
 		let contentBytes = da.toCBOR(options: CBOROptions()).taggedEncoded.encode(options: CBOROptions())
 		let coseRes: Cose
@@ -43,6 +48,6 @@ struct MdocAuthentication {
             guard let symmetricKey = try self.makeMACKeyAggrementAndDeriveKey(deviceAuth: da) else { return nil}
             coseRes = Cose.makeDetachedCoseMac0(payloadData: Data(contentBytes), key: symmetricKey, alg: .hmac256)
 	    }
-		return DeviceAuth(cose: coseRes)
+		return DeviceAuth(coseMacOrSignature: coseRes)
 	}
 }

@@ -24,7 +24,7 @@ public struct IssuerAuthentication {
 	}
 	
 	public static func validateDigests(for document: Document, mso: MobileSecurityObject) -> (Bool, [String: Bool]) {
-		guard let issuerNamespaces = document.issuerSigned.nameSpaces?.issuerNameSpaces, let dak = DigestAlgorithmKind(rawValue: mso.digestAlgorithm) else { return (false, [:]) }
+		guard let issuerNamespaces = document.issuerSigned.issuerNameSpaces?.nameSpaces, let dak = DigestAlgorithmKind(rawValue: mso.digestAlgorithm) else { return (false, [:]) }
 		var failedElements = [String: Bool]()
 		var result = (true, failedElements)
 		for (ns,items) in issuerNamespaces {
@@ -41,9 +41,9 @@ public struct IssuerAuthentication {
 	}
 	
 	// temporary function, mso should come from the server
-	public static func makeDefaultMSO(for document: Document, iaca: Data) -> MobileSecurityObject? {
+	public static func makeDefaultMSO(for document: Document, deviceKey: CoseKey) -> MobileSecurityObject? {
 		let dak = MobileSecurityObject.defaultDigestAlgorithmKind
-		guard let issuerNamespaces = document.issuerSigned.nameSpaces?.issuerNameSpaces else { return nil }
+		guard let issuerNamespaces = document.issuerSigned.issuerNameSpaces?.nameSpaces else { return nil }
 		var vd = [NameSpace: DigestIDs]()
 		for (ns,items) in issuerNamespaces {
 			var dids = [DigestID: [UInt8]]()
@@ -56,18 +56,19 @@ public struct IssuerAuthentication {
 		}
 		let valueDigests = ValueDigests(valueDigests: vd)
 		let validityInfo = ValidityInfo(signed: isoDateFormatter.string(from: Date()), validFrom: isoDateFormatter.string(from: Date()), validUntil: isoDateFormatter.string(from: Calendar.current.date(byAdding: .month, value: 2, to: Date())!))
-		guard let publicKey963 = getPublicKeyx963(publicCertData: iaca) else { return nil }
-		let deviceKey = CoseKey(crv: .p256, x963Representation: publicKey963)
 		let mso = MobileSecurityObject(version: MobileSecurityObject.defaultVersion, digestAlgorithm: dak.rawValue, valueDigests: valueDigests, deviceKey: deviceKey, docType: document.docType, validityInfo: validityInfo)
 		return mso
 	}
 	
-	public static func makeDefaultIssuerAuth(for document: Document, iaca: Data) throws -> IssuerAuth? {
+	// temporary function, mso should come from the server
+	public static func makeDefaultIssuerAuth(for document: Document, iaca: Data) throws -> (IssuerAuth, CoseKeyPrivate)? {
 		guard let publicKey963 = getPublicKeyx963(publicCertData: iaca) else { return nil }
-		guard let mso = makeDefaultMSO(for: document, iaca: iaca) else { return nil }
-		let msoRawData = mso.toCBOR(options: CBOROptions()).encode()
-		let signature = try Cose.computeSignatureValue(Data(msoRawData), deviceKey_x963: publicKey963, alg: .es256)
+		let pk = CoseKeyPrivate(crv: .p256)
+		guard let mso = makeDefaultMSO(for: document, deviceKey: pk.key) else { return nil }
+		let msoRawData = mso.taggedEncoded.encode()
+		// here we need the issuer (iaca) private key
+		let signature = try Cose.computeSignatureValue(Data(msoRawData), deviceKey_x963: pk.getx963Representation(), alg: .es256)
 		let ia = IssuerAuth(mso: mso, msoRawData: msoRawData, verifyAlgorithm: .es256, signature: signature, iaca: [iaca.bytes])
-		return ia
+		return (ia, pk)
 	}
 }

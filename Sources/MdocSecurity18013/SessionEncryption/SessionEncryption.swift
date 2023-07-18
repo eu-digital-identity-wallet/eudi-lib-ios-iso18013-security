@@ -76,7 +76,7 @@ public struct SessionEncryption {
 		let decryptedContent = try AES.GCM.open(sealedBox, using: symmetricKeyForDecrypt)
 		return [UInt8](decryptedContent)
 	}
-	var transcript: SessionTranscript { SessionTranscript(devEngRawData: deviceEngagementRawData, eReaderRawData: eReaderKeyRawData, handOver: handOver) }
+	public var transcript: SessionTranscript { SessionTranscript(devEngRawData: deviceEngagementRawData, eReaderRawData: eReaderKeyRawData, handOver: handOver) }
 	
 	/// SessionTranscript = [DeviceEngagementBytes,EReaderKeyBytes,Handover]
 	public var sessionTranscriptBytes: [UInt8] {

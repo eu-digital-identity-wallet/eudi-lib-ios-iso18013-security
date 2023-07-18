@@ -15,7 +15,7 @@ public struct SessionEstablishment {
 		case eReaderKey
 		case data
 	}
-	var eReaderKey: CoseKey? { CoseKey(data: eReaderKeyRawData) }
+	public var eReaderKey: CoseKey? { CoseKey(data: eReaderKeyRawData) }
 }
 
 extension SessionEstablishment: CBORDecodable {
