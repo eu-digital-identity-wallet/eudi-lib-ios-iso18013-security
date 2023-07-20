@@ -11,14 +11,14 @@ import SwiftCBOR
 /// var se = SessionEncryption(se: sessionEstablishmentObject, de: deviceEngagementObject, handOver: handOverObject)
 /// ```
 public struct SessionEncryption {
-	let sessionRole: SessionRole
-	public var sessionCounter: UInt32 = 1
+	public let sessionRole: SessionRole
+	var sessionCounter: UInt32 = 1
 	var errorCode: UInt?
 	static let IDENTIFIER0: [UInt8] = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
 	static let IDENTIFIER1: [UInt8] = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01]
 	var encryptionIdentifier: [UInt8] { sessionRole == .reader ? Self.IDENTIFIER0 : Self.IDENTIFIER1 }
 	var decryptionIdentifier: [UInt8] { sessionRole == .reader ? Self.IDENTIFIER1 : Self.IDENTIFIER0 }
-	let sessionKeys: CoseKeyExchange
+	public let sessionKeys: CoseKeyExchange
 	var deviceEngagementRawData: [UInt8]
 	let eReaderKeyRawData: [UInt8]
 	let handOver: CBOR
