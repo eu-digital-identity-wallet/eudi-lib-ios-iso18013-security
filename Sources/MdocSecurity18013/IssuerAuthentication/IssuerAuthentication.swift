@@ -4,9 +4,15 @@ import SwiftCBOR
 import MdocDataModel18013
 import CryptoKit
 
+/// Utility functions that can be used for issuer authentication
 public struct IssuerAuthentication {
 	public static var isoDateFormatter: ISO8601DateFormatter = {let df = ISO8601DateFormatter(); df.formatOptions = [.withFullDate, .withTime, .withTimeZone, .withColonSeparatorInTime, .withDashSeparatorInDate]; return df}()
 
+	/// Calculate has of data according to a hash algorithm
+	/// - Parameters:
+	///   - d: Digest algorithm identifier
+	///   - bytes: Bytes over which the hash is calculated
+	/// - Returns: The hash value
 	public static func getHash(_ d:DigestAlgorithmKind, bytes: [UInt8]) -> Data {
 		switch d {
 		case .SHA256: let h = SHA256.hash(data:Data(bytes)); return h.withUnsafeBytes { (p: UnsafeRawBufferPointer) -> Data in Data(p[0..<p.count]) }
@@ -15,6 +21,12 @@ public struct IssuerAuthentication {
 		}
 	}
 	
+	/// Validate a digest values included in the ``MobileSecurityObject`` structure
+	/// - Parameters:
+	///   - signedItem: Issuer signed item
+	///   - dak: Digest algorithm identifier
+	///   - digest: Digest value included in the MSO structure
+	/// - Returns: True if validation succeeds
 	public static func validateDigest(for signedItem: IssuerSignedItem, dak: DigestAlgorithmKind, digest: [UInt8]?) -> Bool {
 		guard let digest else {return false}
 		let issuerSignedItemBytes = signedItem.encode(options: CBOROptions()).taggedEncoded.encode()
@@ -23,6 +35,12 @@ public struct IssuerAuthentication {
 		return false
 	}
 	
+	/// Validate all digest values included in the ``MobileSecurityObject`` structure
+	/// - Parameters:
+	///   - document: Issuser signed document
+	///   - dak: Digest algorithm identifier
+	///   - digest: Digest value included in the MSO structure
+	/// - Returns: True if validation succeeds
 	public static func validateDigests(for document: Document, mso: MobileSecurityObject) -> (Bool, [String: Bool]) {
 		guard let issuerNamespaces = document.issuerSigned.issuerNameSpaces?.nameSpaces, let dak = DigestAlgorithmKind(rawValue: mso.digestAlgorithm) else { return (false, [:]) }
 		var failedElements = [String: Bool]()
@@ -40,7 +58,7 @@ public struct IssuerAuthentication {
 		return result
 	}
 	
-	// temporary function, mso should come from the server
+	/// Temporary function, mso should come from the server. Used to compute an MSO if not provided in sample data
 	public static func makeDefaultMSO(for document: Document, deviceKey: CoseKey) -> MobileSecurityObject? {
 		let dak = MobileSecurityObject.defaultDigestAlgorithmKind
 		guard let issuerNamespaces = document.issuerSigned.issuerNameSpaces?.nameSpaces else { return nil }
@@ -55,14 +73,13 @@ public struct IssuerAuthentication {
 			vd[ns] = DigestIDs(digestIDs: dids)
 		}
 		let valueDigests = ValueDigests(valueDigests: vd)
-		let validityInfo = ValidityInfo(signed: isoDateFormatter.string(from: Date()), validFrom: isoDateFormatter.string(from: Date()), validUntil: isoDateFormatter.string(from: Calendar.current.date(byAdding: .month, value: 2, to: Date())!))
+		let validityInfo = ValidityInfo(signed: isoDateFormatter.string(from: Date()), validFrom: isoDateFormatter.string(from: Calendar.current.date(byAdding: .second, value: 1, to: Date())!), validUntil: isoDateFormatter.string(from: Calendar.current.date(byAdding: .month, value: 1, to: Date())!))
 		let mso = MobileSecurityObject(version: MobileSecurityObject.defaultVersion, digestAlgorithm: dak.rawValue, valueDigests: valueDigests, deviceKey: deviceKey, docType: document.docType, validityInfo: validityInfo)
 		return mso
 	}
 	
-	// temporary function, mso should come from the server
+	/// Temporary function, mso should come from the server. Used to compute an IssuerAuth structure if not provided in sample data
 	public static func makeDefaultIssuerAuth(for document: Document, iaca: Data) throws -> (IssuerAuth, CoseKeyPrivate)? {
-		guard let publicKey963 = getPublicKeyx963(publicCertData: iaca) else { return nil }
 		let pk = CoseKeyPrivate(crv: .p256)
 		guard let mso = makeDefaultMSO(for: document, deviceKey: pk.key) else { return nil }
 		let msoRawData = mso.taggedEncoded.encode()
