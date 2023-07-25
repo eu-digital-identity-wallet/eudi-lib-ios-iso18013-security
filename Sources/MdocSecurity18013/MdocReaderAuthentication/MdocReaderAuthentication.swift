@@ -7,7 +7,8 @@ import SwiftCBOR
 ///
 /// The data that the mdoc reader authenticates is the ReaderAuthentication structure
 /// Currently the mdoc side is implemented (verification of reader-auth CBOR data)
-struct MdocReaderAuthentication {
+public struct MdocReaderAuthentication {
+
     let transcript: SessionTranscript
 	
 	/// Validate the reader auth structure contained in the the reader's initial message
@@ -22,5 +23,9 @@ struct MdocReaderAuthentication {
 		guard let readerAuth = Cose(type: .sign1, cbor: readerAuthCBOR) else { return false }
         guard let publicKeyx963 = getPublicKeyx963(publicCertData: readerAuthCertificate)  else { return false }
         return try readerAuth.validateDetachedCoseSign1(payloadData: Data(contentBytes), publicKey_x963: publicKeyx963)
+	}
+	
+	public init(transcript: SessionTranscript) {
+		self.transcript = transcript
 	}
 }
