@@ -43,7 +43,7 @@ final class MdocSecurity18013Tests: XCTestCase {
         let se: SessionEstablishment = try XCTUnwrap(SessionEstablishment(cbor: dse))
         var de = try XCTUnwrap(DeviceEngagement(data: transcript.devEngRawData))
         de.setD(d: Self.AnnexdTestData.d51_ephDeviceKey.d)
-        var sessionEncr = try XCTUnwrap(SessionEncryption(deviceKey: AnnexdTestData.d53_deviceKey, se: se, de: de, handOver: transcript.handOver))
+        var sessionEncr = try XCTUnwrap(SessionEncryption(se: se, de: de, handOver: transcript.handOver))
 		sessionEncr.deviceEngagementRawData = transcript.devEngRawData // cbor encoding differs between implemenentations, for mDL with our own implementation they will be identical
         return (se, sessionEncr)
     }

@@ -5,12 +5,18 @@ import Logging
 
 /// Message data transfered between mDL and mDL reader
 public struct SessionData {
-	let data: [UInt8]?
-	let status: UInt64?
+	
+	public let data: [UInt8]?
+	public let status: UInt64?
 	
 	enum CodingKeys: String, CodingKey {
 		case data
 		case status
+	}
+
+	public init(cipher_data: [UInt8]? = nil, status: UInt64? = nil) {
+		self.data = cipher_data
+		self.status = status
 	}
 }
 

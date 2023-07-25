@@ -16,7 +16,12 @@ extension Cose {
 		// return COSE_MAC0 struct
 		return Cose(type: .mac0, algorithm: alg.rawValue, signature: computeMACValue(dataToSign, key: key, alg: alg))
 	}
-	
+	/// Computes a message authenticated code for the data
+	/// - Parameters:
+	///   - dataToAuthenticate: Data for which to compute the code
+	///   - key: symmetric key
+	///   - alg: HMAC algorithm variant
+	/// - Returns: The message authenticated code
 	public static func computeMACValue(_ dataToAuthenticate: Data, key: SymmetricKey, alg: Cose.MacAlgorithm) -> Data {
 		let mac0Value: Data
 		switch alg {
