@@ -14,12 +14,13 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../MdocDataModel18013"), 
-        .package(url: "https://github.com/apple/swift-log.git", branch: "main"),],
+        .package(url: "https://github.com/apple/swift-log.git", branch: "main"),
+        .package(url: "https://github.com/filom/ASN1Decoder", from: "1.8.0")],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
-            name: "MdocSecurity18013", dependencies: ["MdocDataModel18013", .product(name: "Logging", package: "swift-log")]),
+            name: "MdocSecurity18013", dependencies: ["MdocDataModel18013", "ASN1Decoder", .product(name: "Logging", package: "swift-log")]),
         .testTarget(
             name: "MdocSecurity18013Tests",
             dependencies: ["MdocSecurity18013"]),
