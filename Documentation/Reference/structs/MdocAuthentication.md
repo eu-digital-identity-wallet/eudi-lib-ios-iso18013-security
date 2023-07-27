@@ -9,11 +9,12 @@
   - `authKeys`
   - `sessionTranscriptBytes`
 - [Methods](#methods)
+  - `init(transcript:authKeys:)`
   - `makeMACKeyAggrementAndDeriveKey(deviceAuth:)`
   - `getDeviceAuthForTransfer(docType:deviceNameSpacesRawData:bUseDeviceSign:)`
 
 ```swift
-struct MdocAuthentication
+public struct MdocAuthentication
 ```
 
 Implements mdoc authentication
@@ -46,6 +47,12 @@ var sessionTranscriptBytes: [UInt8]
 ```
 
 ## Methods
+### `init(transcript:authKeys:)`
+
+```swift
+public init(transcript: SessionTranscript, authKeys: CoseKeyExchange)
+```
+
 ### `makeMACKeyAggrementAndDeriveKey(deviceAuth:)`
 
 ```swift
@@ -58,7 +65,7 @@ The inputs shall be the SDeviceKey.Priv and EReaderKey.Pub for the mdoc and ERea
 ### `getDeviceAuthForTransfer(docType:deviceNameSpacesRawData:bUseDeviceSign:)`
 
 ```swift
-public func getDeviceAuthForTransfer(docType: String, deviceNameSpacesRawData: [UInt8], bUseDeviceSign: Bool = false) throws -> DeviceAuth?
+public func getDeviceAuthForTransfer(docType: String, deviceNameSpacesRawData: [UInt8] = [0xA0], bUseDeviceSign: Bool = false) throws -> DeviceAuth?
 ```
 
 Generate a ``DeviceAuth`` structure used for mdoc-authentication

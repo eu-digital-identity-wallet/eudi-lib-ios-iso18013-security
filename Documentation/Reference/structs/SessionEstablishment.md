@@ -20,17 +20,17 @@ The mdoc uses the data from the session establishment message to derive the sess
 ### `eReaderKeyRawData`
 
 ```swift
-let eReaderKeyRawData: [UInt8]
+public let eReaderKeyRawData: [UInt8]
 ```
 
 ### `data`
 
 ```swift
-let data: [UInt8]
+public let data: [UInt8]
 ```
 
 ### `eReaderKey`
 
 ```swift
-var eReaderKey: CoseKey?
+public var eReaderKey: CoseKey?
 ```
