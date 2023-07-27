@@ -10,6 +10,15 @@
       }
     },
     {
+      "identity" : "eudi-lib-ios-iso18013-data-model",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/eu-digital-identity-wallet/eudi-lib-ios-iso18013-data-model.git",
+      "state" : {
+        "branch" : "develop",
+        "revision" : "4519b96ca86f56271abebea1cdf57c2ae238f02b"
+      }
+    },
+    {
       "identity" : "swift-log",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-log.git",
