@@ -43,13 +43,13 @@ var se = SessionEncryption(se: sessionEstablishmentObject, de: deviceEngagementO
 ### `sessionRole`
 
 ```swift
-let sessionRole: SessionRole
+public let sessionRole: SessionRole
 ```
 
 ### `sessionCounter`
 
 ```swift
-public var sessionCounter: UInt32 = 1
+var sessionCounter: UInt32 = 1
 ```
 
 ### `errorCode`
@@ -85,7 +85,7 @@ var decryptionIdentifier: [UInt8]
 ### `sessionKeys`
 
 ```swift
-let sessionKeys: CoseKeyExchange
+public let sessionKeys: CoseKeyExchange
 ```
 
 ### `deviceEngagementRawData`
@@ -109,7 +109,7 @@ let handOver: CBOR
 ### `transcript`
 
 ```swift
-var transcript: SessionTranscript
+public var transcript: SessionTranscript
 ```
 
 ### `sessionTranscriptBytes`
@@ -124,7 +124,7 @@ SessionTranscript = [DeviceEngagementBytes,EReaderKeyBytes,Handover]
 ### `init(se:de:handOver:)`
 
 ```swift
-init?(se: SessionEstablishment, de: DeviceEngagement, handOver: CBOR)
+public init?(se: SessionEstablishment, de: DeviceEngagement, handOver: CBOR)
 ```
 
 Initialization of session encryption for the mdoc
@@ -172,7 +172,7 @@ computation of HKDF symmetric key
 ### `encrypt(_:)`
 
 ```swift
-mutating func encrypt(_ data: [UInt8]) throws -> [UInt8]?
+mutating public func encrypt(_ data: [UInt8]) throws -> [UInt8]?
 ```
 
 encrypt data using current nonce as described in 9.1.1.5 Cryptographic operations
@@ -180,7 +180,7 @@ encrypt data using current nonce as described in 9.1.1.5 Cryptographic operation
 ### `decrypt(_:)`
 
 ```swift
-mutating func decrypt(_ ciphertext: [UInt8]) throws -> [UInt8]?
+mutating public func decrypt(_ ciphertext: [UInt8]) throws -> [UInt8]?
 ```
 
 decryptes cipher data using the symmetric key

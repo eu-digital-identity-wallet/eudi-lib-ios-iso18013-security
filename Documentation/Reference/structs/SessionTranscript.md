@@ -10,7 +10,7 @@
   - `handOver`
 
 ```swift
-struct SessionTranscript
+public struct SessionTranscript
 ```
 
 SessionTranscript = [DeviceEngagementBytes,EReaderKeyBytes,Handover]

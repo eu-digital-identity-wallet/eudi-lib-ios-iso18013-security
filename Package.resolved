@@ -1,6 +1,24 @@
 {
   "pins" : [
     {
+      "identity" : "asn1decoder",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/filom/ASN1Decoder",
+      "state" : {
+        "revision" : "65953a42a0f039f53c73e48fd88c02809f7db607",
+        "version" : "1.8.0"
+      }
+    },
+    {
+      "identity" : "eudi-lib-ios-iso18013-data-model",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/eu-digital-identity-wallet/eudi-lib-ios-iso18013-data-model.git",
+      "state" : {
+        "branch" : "develop",
+        "revision" : "4519b96ca86f56271abebea1cdf57c2ae238f02b"
+      }
+    },
+    {
       "identity" : "swift-log",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-log.git",
