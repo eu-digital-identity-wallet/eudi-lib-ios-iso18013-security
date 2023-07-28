@@ -1,6 +1,6 @@
 # eudi-lib-ios-iso18013-security
 
-[![Swift](https://github.com/eu-digital-identity-wallet/eudi-lib-ios-iso18013-security/actions/workflows/swift.yml/badge.svg?event=workflow_run)](https://github.com/eu-digital-identity-wallet/eudi-lib-ios-iso18013-security/actions/workflows/swift.yml)
+[![Swift](https://github.com/eu-digital-identity-wallet/eudi-lib-ios-iso18013-security/actions/workflows/swift.yml/badge.svg)](https://github.com/eu-digital-identity-wallet/eudi-lib-ios-iso18013-security/actions/workflows/swift.yml)
 
 Implementation of mDoc security according to [ISO/IEC 18013-5](https://www.iso.org/standard/69084.html) standard
 (0.9.0)
