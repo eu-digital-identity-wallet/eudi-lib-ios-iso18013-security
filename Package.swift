@@ -20,7 +20,10 @@ let package = Package(
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
-            name: "MdocSecurity18013", dependencies: ["MdocDataModel18013", "ASN1Decoder", .product(name: "Logging", package: "swift-log")]),
+            name: "MdocSecurity18013", dependencies: [
+                .product(name: "MdocDataModel18013", package: "eudi-lib-ios-iso18013-data-model"), 
+                "ASN1Decoder", 
+                .product(name: "Logging", package: "swift-log")]),
         .testTarget(
             name: "MdocSecurity18013Tests",
             dependencies: ["MdocSecurity18013"]),
