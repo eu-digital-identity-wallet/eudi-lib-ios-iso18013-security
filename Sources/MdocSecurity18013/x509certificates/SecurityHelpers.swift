@@ -28,7 +28,7 @@ public enum NotAllowedExtension: String, CaseIterable {
   
   public static func isValidMdlPublicKey(secCert: SecCertificate, usage: CertificateUsage, rootCerts: [SecCertificate], checkCrl: Bool = true, maxValPeriod: UInt = UInt.max) -> (isValid:Bool, reason: String?, rootCert: SecCertificate?) {
     var trust: SecTrust?; let policy = SecPolicyCreateBasicX509(); _ = SecTrustCreateWithCertificates(secCert, policy, &trust)
-    guard let trust else { return (false,nil, nil) }
+    guard let trust else { return (false, "Certificate not valid", nil) }
     let secData: Data = SecCertificateCopyData(secCert) as Data
     let x509test = try? X509Certificate(der: secData)
     guard let x509test, let notAfter = x509test.notAfter, let notBefore = x509test.notBefore else { return (false,"Missing certificate for \(usage)", nil) }
@@ -71,7 +71,7 @@ public enum NotAllowedExtension: String, CaseIterable {
         }
       }
     } // next
-    return (false, nil, nil)
+    return (false, "Certificate not matched with root certificates", nil)
   }
   
   public static func trustIsValid(_ trust: SecTrust) -> Bool {
