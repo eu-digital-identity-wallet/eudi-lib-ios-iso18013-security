@@ -83,8 +83,9 @@ final class MdocSecurity18013Tests: XCTestCase {
 		for docR in dr.docRequests {
 			let mdocAuth = MdocReaderAuthentication(transcript: sessionEncr.transcript)
 			guard let readerAuthRawCBOR = docR.readerAuthRawCBOR else { continue }
-			let b = try mdocAuth.validateReaderAuth(readerAuthCBOR: readerAuthRawCBOR, readerAuthCertificate: docR.readerCertificate!, itemsRequestRawData: docR.itemsRequestRawData!)
-			XCTAssertTrue(b, "Reader auth not validated")
+			let (b, message) = try mdocAuth.validateReaderAuth(readerAuthCBOR: readerAuthRawCBOR, readerAuthCertificate: docR.readerCertificate!, itemsRequestRawData: docR.itemsRequestRawData!)
+			XCTAssertTrue(b, "Reader auth signature not validated")
+            print(message ?? "")
 		}
 	}
 }
