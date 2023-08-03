@@ -1,6 +1,11 @@
 # eudi-lib-ios-iso18013-security
 
 [![Swift](https://github.com/eu-digital-identity-wallet/eudi-lib-ios-iso18013-security/actions/workflows/swift.yml/badge.svg)](https://github.com/eu-digital-identity-wallet/eudi-lib-ios-iso18013-security/actions/workflows/swift.yml)
+[![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=eu-digital-identity-wallet_eudi-lib-ios-iso18013-security&metric=ncloc&token=270646d93c527944c1aca89437311971a792d62d)](https://sonarcloud.io/summary/new_code?id=eu-digital-identity-wallet_eudi-lib-ios-iso18013-security)
+[![Duplicated Lines (%)](https://sonarcloud.io/api/project_badges/measure?project=eu-digital-identity-wallet_eudi-lib-ios-iso18013-security&metric=duplicated_lines_density&token=270646d93c527944c1aca89437311971a792d62d)](https://sonarcloud.io/summary/new_code?id=eu-digital-identity-wallet_eudi-lib-ios-iso18013-security)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=eu-digital-identity-wallet_eudi-lib-ios-iso18013-security&metric=reliability_rating&token=270646d93c527944c1aca89437311971a792d62d)](https://sonarcloud.io/summary/new_code?id=eu-digital-identity-wallet_eudi-lib-ios-iso18013-security)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=eu-digital-identity-wallet_eudi-lib-ios-iso18013-security&metric=vulnerabilities&token=270646d93c527944c1aca89437311971a792d62d)](https://sonarcloud.io/summary/new_code?id=eu-digital-identity-wallet_eudi-lib-ios-iso18013-security)
+
 
 Implementation of mDoc security according to [ISO/IEC 18013-5](https://www.iso.org/standard/69084.html) standard
 (0.9.0)
