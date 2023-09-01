@@ -77,15 +77,5 @@ public struct IssuerAuthentication {
 		let mso = MobileSecurityObject(version: MobileSecurityObject.defaultVersion, digestAlgorithm: dak.rawValue, valueDigests: valueDigests, deviceKey: deviceKey, docType: document.docType, validityInfo: validityInfo)
 		return mso
 	}
-	
-	/// Temporary function, mso should come from the server. Used to compute an IssuerAuth structure if not provided in sample data
-	public static func makeDefaultIssuerAuth(for document: Document, iaca: Data) throws -> (IssuerAuth, CoseKeyPrivate)? {
-		let pk = CoseKeyPrivate(crv: .p256)
-		guard let mso = makeDefaultMSO(for: document, deviceKey: pk.key) else { return nil }
-		let msoRawData = mso.taggedEncoded.encode()
-		// here we need the issuer (iaca) private key
-		let signature = try Cose.computeSignatureValue(Data(msoRawData), deviceKey_x963: pk.getx963Representation(), alg: .es256)
-		let ia = IssuerAuth(mso: mso, msoRawData: msoRawData, verifyAlgorithm: .es256, signature: signature, iaca: [iaca.bytes])
-		return (ia, pk)
-	}
+
 }
