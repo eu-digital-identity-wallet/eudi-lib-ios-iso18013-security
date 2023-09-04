@@ -7,7 +7,7 @@ import SwiftCBOR
 /// 
 /// The security objective of mdoc authentication is to prevent cloning of the mdoc and to mitigate man in the middle attacks.
 /// Currently the mdoc side is implemented (generation of device-auth)
-/// Initialized from the session trascript object, the device private key and the reader ephemeral public key 
+/// Initialized from the session transcript object, the device private key and the reader ephemeral public key 
 /// 
 /// ```swift
 /// let mdocAuth = MdocAuthentication(transcript: sessionEncr.transcript, authKeys: authKeys)

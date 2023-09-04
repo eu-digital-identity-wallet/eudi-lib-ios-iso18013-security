@@ -57,35 +57,6 @@ public struct IssuerAuthentication {
 		}
 		return result
 	}
-	
-	/// Temporary function, mso should come from the server. Used to compute an MSO if not provided in sample data
-	public static func makeDefaultMSO(for document: Document, deviceKey: CoseKey) -> MobileSecurityObject? {
-		let dak = MobileSecurityObject.defaultDigestAlgorithmKind
-		guard let issuerNamespaces = document.issuerSigned.issuerNameSpaces?.nameSpaces else { return nil }
-		var vd = [NameSpace: DigestIDs]()
-		for (ns,items) in issuerNamespaces {
-			var dids = [DigestID: [UInt8]]()
-			for item in items {
-				let issuerSignedItemBytes = item.encode(options: CBOROptions()).taggedEncoded.encode()
-				let itemDigest = Self.getHash(dak, bytes: issuerSignedItemBytes)
-				dids[item.digestID] = [UInt8](itemDigest)
-			}
-			vd[ns] = DigestIDs(digestIDs: dids)
-		}
-		let valueDigests = ValueDigests(valueDigests: vd)
-		let validityInfo = ValidityInfo(signed: isoDateFormatter.string(from: Date()), validFrom: isoDateFormatter.string(from: Calendar.current.date(byAdding: .second, value: 1, to: Date())!), validUntil: isoDateFormatter.string(from: Calendar.current.date(byAdding: .month, value: 1, to: Date())!))
-		let mso = MobileSecurityObject(version: MobileSecurityObject.defaultVersion, digestAlgorithm: dak.rawValue, valueDigests: valueDigests, deviceKey: deviceKey, docType: document.docType, validityInfo: validityInfo)
-		return mso
-	}
-	
-	/// Temporary function, mso should come from the server. Used to compute an IssuerAuth structure if not provided in sample data
-	public static func makeDefaultIssuerAuth(for document: Document, iaca: Data) throws -> (IssuerAuth, CoseKeyPrivate)? {
-		let pk = CoseKeyPrivate(crv: .p256)
-		guard let mso = makeDefaultMSO(for: document, deviceKey: pk.key) else { return nil }
-		let msoRawData = mso.taggedEncoded.encode()
-		// here we need the issuer (iaca) private key
-		let signature = try Cose.computeSignatureValue(Data(msoRawData), deviceKey_x963: pk.getx963Representation(), alg: .es256)
-		let ia = IssuerAuth(mso: mso, msoRawData: msoRawData, verifyAlgorithm: .es256, signature: signature, iaca: [iaca.bytes])
-		return (ia, pk)
-	}
+
+
 }
