@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import Foundation
-import CryptoKit
+import Crypto
 import MdocDataModel18013
 
 extension Cose {
@@ -36,7 +36,7 @@ extension Cose {
 		return Cose(type: .sign1, algorithm: alg.rawValue, signature: try computeSignatureValue(dataToSign, deviceKey_x963: deviceKey_x963, alg: alg))
 	}
 	
-	/// Generates an Elliptic Curve Digital Signature Algorithm (ECDSA) signature of the provide data over an elliptic curve. Apple CryptoKit implementation is used
+	/// Generates an Elliptic Curve Digital Signature Algorithm (ECDSA) signature of the provide data over an elliptic curve. Apple Crypto implementation is used
 	/// - Parameters:
 	///   - dataToSign: Data to create the signature for (payload)
 	///   - deviceKey_x963: x963 representation of the private key

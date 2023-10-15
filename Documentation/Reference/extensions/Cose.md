@@ -81,7 +81,7 @@ Create a detached COSE-Sign1 structure according to https://datatracker.ietf.org
 public static func computeSignatureValue(_ dataToSign: Data, deviceKey_x963: Data, alg: Cose.VerifyAlgorithm) throws -> Data
 ```
 
-Generates an Elliptic Curve Digital Signature Algorithm (ECDSA) signature of the provide data over an elliptic curve. Apple CryptoKit implementation is used
+Generates an Elliptic Curve Digital Signature Algorithm (ECDSA) signature of the provide data over an elliptic curve. Apple Crypto implementation is used
 - Parameters:
   - dataToSign: Data to create the signature for (payload)
   - deviceKey_x963: x963 representation of the private key

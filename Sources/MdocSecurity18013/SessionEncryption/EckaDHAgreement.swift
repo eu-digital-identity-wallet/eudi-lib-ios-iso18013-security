@@ -16,7 +16,7 @@ limitations under the License.
 
 //  EckaDHAgreement.swift
 import Foundation
-import CryptoKit
+import Crypto
 import MdocDataModel18013
 
 extension CoseKeyExchange {
