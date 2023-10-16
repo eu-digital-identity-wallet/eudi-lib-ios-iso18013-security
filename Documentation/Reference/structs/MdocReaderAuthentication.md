@@ -30,7 +30,7 @@ let transcript: SessionTranscript
 ### `validateReaderAuth(readerAuthCBOR:readerAuthCertificate:itemsRequestRawData:rootCerts:)`
 
 ```swift
-public func validateReaderAuth(readerAuthCBOR: CBOR, readerAuthCertificate: Data, itemsRequestRawData: [UInt8], rootCerts: [SecCertificate]? = nil) throws -> Bool
+public func validateReaderAuth(readerAuthCBOR: CBOR, readerAuthCertificate: Data, itemsRequestRawData: [UInt8], rootCerts: [SecCertificate]? = nil) throws -> (Bool, String?)
 ```
 
 Validate the reader auth structure contained in the the reader's initial message
@@ -38,7 +38,7 @@ Validate the reader auth structure contained in the the reader's initial message
   - readerAuthCBOR: An untagged COSE-Sign1 structure containing the signature
   - readerAuthCertificate: The reader auth certificate decoded from above reader-auth structure. Contains the mdoc reader public key
   - itemsRequestRawData: Reader's item request raw data
-- Returns: True if verification of reader auth succeeds.
+- Returns: (True if verification of reader auth has valid signature, reason for certificate validation failure)
 
 #### Parameters
 

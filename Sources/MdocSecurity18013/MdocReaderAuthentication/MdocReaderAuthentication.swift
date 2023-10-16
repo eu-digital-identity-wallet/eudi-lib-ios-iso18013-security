@@ -16,7 +16,7 @@ limitations under the License.
 
 import Foundation
 import Logging
-import CryptoKit
+import Crypto
 import MdocDataModel18013
 import SwiftCBOR
 

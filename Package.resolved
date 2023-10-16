@@ -5,8 +5,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/filom/ASN1Decoder",
       "state" : {
-        "revision" : "65953a42a0f039f53c73e48fd88c02809f7db607",
-        "version" : "1.8.0"
+        "revision" : "d30708c89cbbf8f0f27122a53fbd98d0cda079fd",
+        "version" : "1.9.0"
       }
     },
     {
@@ -15,7 +15,16 @@
       "location" : "https://github.com/eu-digital-identity-wallet/eudi-lib-ios-iso18013-data-model.git",
       "state" : {
         "branch" : "develop",
-        "revision" : "b7fb4eba813737c52051fcb58d54b0d83a2c67f4"
+        "revision" : "030aa420a21bc659b36bd73b6d852941422d1b20"
+      }
+    },
+    {
+      "identity" : "swift-crypto",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-crypto.git",
+      "state" : {
+        "revision" : "60f13f60c4d093691934dc6cfdf5f508ada1f894",
+        "version" : "2.6.0"
       }
     },
     {
