@@ -10,8 +10,6 @@
   - `getHash(_:bytes:)`
   - `validateDigest(for:dak:digest:)`
   - `validateDigests(for:mso:)`
-  - `makeDefaultMSO(for:deviceKey:)`
-  - `makeDefaultIssuerAuth(for:iaca:)`
 
 ```swift
 public struct IssuerAuthentication
@@ -87,19 +85,3 @@ Validate all digest values included in the ``MobileSecurityObject`` structure
 | document | Issuser signed document |
 | dak | Digest algorithm identifier |
 | digest | Digest value included in the MSO structure |
-
-### `makeDefaultMSO(for:deviceKey:)`
-
-```swift
-public static func makeDefaultMSO(for document: Document, deviceKey: CoseKey) -> MobileSecurityObject?
-```
-
-Temporary function, mso should come from the server. Used to compute an MSO if not provided in sample data
-
-### `makeDefaultIssuerAuth(for:iaca:)`
-
-```swift
-public static func makeDefaultIssuerAuth(for document: Document, iaca: Data) throws -> (IssuerAuth, CoseKeyPrivate)?
-```
-
-Temporary function, mso should come from the server. Used to compute an IssuerAuth structure if not provided in sample data
