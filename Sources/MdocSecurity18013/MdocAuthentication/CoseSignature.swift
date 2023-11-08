@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import Foundation
-import Crypto
+import CryptoKit
 import MdocDataModel18013
 
 extension Cose {

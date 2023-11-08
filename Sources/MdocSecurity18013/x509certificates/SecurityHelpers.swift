@@ -1,5 +1,5 @@
  import Foundation
- import Crypto
+ import CryptoKit
  import ASN1Decoder
 
 public enum CertificateUsage {
