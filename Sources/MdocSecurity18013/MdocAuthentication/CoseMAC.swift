@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import Foundation
-import Crypto
+import CryptoKit
 import MdocDataModel18013
 
 extension Cose {
@@ -42,13 +42,13 @@ extension Cose {
 		let mac0Value: Data
 		switch alg {
 		case .hmac256:
-            let hashCode = Crypto.HMAC<SHA256>.authenticationCode(for: dataToAuthenticate, using: key)
+            let hashCode = CryptoKit.HMAC<SHA256>.authenticationCode(for: dataToAuthenticate, using: key)
 			mac0Value = hashCode.withUnsafeBytes{ (p: UnsafeRawBufferPointer) -> Data in  Data(p[0..<p.count]) }
 		case .hmac384:
-            let hashCode = Crypto.HMAC<SHA384>.authenticationCode(for: dataToAuthenticate, using: key)
+            let hashCode = CryptoKit.HMAC<SHA384>.authenticationCode(for: dataToAuthenticate, using: key)
 			mac0Value = hashCode.withUnsafeBytes{ (p: UnsafeRawBufferPointer) -> Data in  Data(p[0..<p.count]) }
 		case .hmac512:
-            let hashCode = Crypto.HMAC<SHA512>.authenticationCode(for: dataToAuthenticate, using: key)
+            let hashCode = CryptoKit.HMAC<SHA512>.authenticationCode(for: dataToAuthenticate, using: key)
 			mac0Value = hashCode.withUnsafeBytes{ (p: UnsafeRawBufferPointer) -> Data in  Data(p[0..<p.count]) }
 		}
 		return mac0Value

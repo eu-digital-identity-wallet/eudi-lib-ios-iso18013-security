@@ -3,7 +3,7 @@
 //
 import Foundation
 import ASN1Decoder
-import Crypto
+import CryptoKit
 
 public class CertificateInfo: CustomDebugStringConvertible {
     let ref: SecCertificate

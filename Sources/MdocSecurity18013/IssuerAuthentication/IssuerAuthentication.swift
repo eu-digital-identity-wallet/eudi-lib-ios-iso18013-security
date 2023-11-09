@@ -18,7 +18,7 @@ limitations under the License.
 import Foundation
 import SwiftCBOR
 import MdocDataModel18013
-import Crypto
+import CryptoKit
 
 /// Utility functions that can be used for issuer authentication
 public struct IssuerAuthentication {
