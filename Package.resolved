@@ -14,8 +14,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/eu-digital-identity-wallet/eudi-lib-ios-iso18013-data-model.git",
       "state" : {
-        "revision" : "d4fe40776d17727a40b7ef5403b64afe0dc6c05d",
-        "version" : "0.1.2"
+        "revision" : "56cab3a6841382748091b0c0202a7f6858842b33",
+        "version" : "0.1.3"
       }
     },
     {
