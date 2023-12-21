@@ -13,17 +13,19 @@ let package = Package(
             targets: ["MdocSecurity18013"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/eu-digital-identity-wallet/eudi-lib-ios-iso18013-data-model.git", from: "0.1.0"), 
-        .package(url: "https://github.com/apple/swift-log.git", branch: "main"),
-        .package(url: "https://github.com/filom/ASN1Decoder", from: "1.8.0")],
+        .package(url: "https://github.com/eu-digital-identity-wallet/eudi-lib-ios-iso18013-data-model.git", .upToNextMajor(from: "0.1.0")), 
+        .package(url: "https://github.com/filom/ASN1Decoder", from: "1.8.0"),
+        .package(url: "https://github.com/apple/swift-log.git", from: "1.5.3"),
+        ], 
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
             name: "MdocSecurity18013", dependencies: [
                 .product(name: "MdocDataModel18013", package: "eudi-lib-ios-iso18013-data-model"), 
-                "ASN1Decoder", 
-                .product(name: "Logging", package: "swift-log")]),
+                "ASN1Decoder",
+                .product(name: "Logging", package: "swift-log"),
+                ]),
         .testTarget(
             name: "MdocSecurity18013Tests",
             dependencies: ["MdocSecurity18013"]),

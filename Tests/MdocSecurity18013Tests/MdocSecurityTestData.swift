@@ -1,18 +1,18 @@
- /*
- * Copyright (c) 2023 European Commission
- *
- * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
- * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
- * except in compliance with the Licence.
- *
- * You may obtain a copy of the Licence at:
- * https://joinup.ec.europa.eu/software/page/eupl
- *
- * Unless required by applicable law or agreed to in writing, software distributed under
- * the Licence is distributed on an "AS IS" basis, WITHOUT WARRANTIES OR CONDITIONS OF
- * ANY KIND, either express or implied. See the Licence for the specific language
- * governing permissions and limitations under the Licence.
- */
+/*
+Copyright (c) 2023 European Commission
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 
 import Foundation
 import MdocDataModel18013
@@ -46,10 +46,10 @@ extension MdocSecurity18013Tests {
 	// D.5.3 mdoc authentication
 	static let d53_deviceKey = CoseKeyPrivate(x: "96313d6c63e24e3372742bfdb1a33ba2c897dcd68ab8c753e4fbd48dca6b7f9a".toBytes()!, y: "1fb3269edd418857de1b39a4e4a44b92fa484caa722c228288f01d0c03a2c3d6".toBytes()!, d: "6ed542ad4783f0b18c833fadf2171273a35d969c581691ef704359cc7cf1e8c0".toBytes()!) 
   static let d53_deviceAuth = Data(base64Encoded: "oWlkZXZpY2VNYWOEQ6EBBaD2WCDplSGoWteJG4BqB/i1OIozLZLBiae/KT7h9UNAWuaCTQ==")!
-  // The following intermediate cryptographic data was used:
-  // EMacKey Zab: 78d98a86fbbb82895874bfafcc161ba69f9b77662172c74b3b0d4643276cf991
-  // EMacKey key: dc2b9566fdaaae3c06baa40993cd0451aeba15e7677ef5305f6531f3533c35dd
-  // MAC tag: e99521a85ad7891b806a07f8b5388a332d92c189a7bf293ee1f543405ae6824d 
+  /* The following intermediate cryptographic data was used:
+   EMacKey Zab: 78d98a86fbbb82895874bfafcc161ba69f9b77662172c74b3b0d4643276cf991
+   EMacKey key: dc2b9566fdaaae3c06baa40993cd0451aeba15e7677ef5305f6531f3533c35dd
+   MAC tag: e99521a85ad7891b806a07f8b5388a332d92c189a7bf293ee1f543405ae6824d */
   //DeviceAuth = { ; Either signature or MAC for mdoc authentication"deviceSignature" : DeviceSignature or "deviceMac" : DeviceMac }
   static let d53_deviceAuthDeviceAuthenticationBytes = Data(base64Encoded: "2BhZAnGEdERldmljZUF1dGhlbnRpY2F0aW9ug9gYWFiiAGMxLjABggHYGFhLpAECIAEhWCBaiNGCvOX0LvpZlD8zNZ0uipaP8onZPl+kRLYkNDFn/iJYILFujPhY3cdpBAe6YdTDOCN6jPzz3mqmcvxgpVeqMvxn2BhYS6QBAiABIVggYOM5I4UEH1FAMFHyQVUxy1bdP5mccWhwE6rGdovIGH4iWCDljeuP2+kH991TaCRVUaNHlvfSIVxEDDObsPe2e+zN+oJYw5ECD0hzFdECCWFjAQEwAQRtZG9jGiAMAWFwcGxpY2F0aW9uL3ZuZC5ibHVldG9vdGgubGUub29iMAgbKBKLNygoAQIcAVweWARpc28ub3JnOjE4MDEzOmRldmljZWVuZ2FnZW1lbnRtZG9jogBjMS4wAYIB2BhYS6QBAiABIVggWojRgrzl9C76WZQ/MzWdLoqWj/KJ2T5fpES2JDQxZ/4iWCCxboz4WN3HaQQHumHUwzgjeoz8895qpnL8YKVXqjL8Z1jNkQIlSHIVkQICY3IBAhECBGFjAQEwABECBmFjAQNuZmMAUQIEYWMBAVcAGiAeAWFwcGxpY2F0aW9uL3ZuZC5ibHVldG9vdGgubGUub29iMAgbKAeAgL8oAQIcAhEHyDL/9tJvoL6zTfzVVdSCOhwRAQNpc28ub3JnOjE4MDEzOm5mY25mYwFaFysBYXBwbGljYXRpb24vdm5kLndmYS5uYW5XAwEBAyMCABMk/smnC5esloSk4yYXbvW5gcXoUz5fACmM/MvDXnAKawIEFHVvcmcuaXNvLjE4MDEzLjUuMS5tREzYGEGg")!
   static let d53_deviceAuthMacStructure = Data(base64Encoded:"hGRNQUMwQ6EBBUBZAnbYGFkCcYR0RGV2aWNlQXV0aGVudGljYXRpb26D2BhYWKIAYzEuMAGCAdgYWEukAQIgASFYIFqI0YK85fQu+lmUPzM1nS6Klo/yidk+X6REtiQ0MWf+IlggsW6M+Fjdx2kEB7ph1MM4I3qM/PPeaqZy/GClV6oy/GfYGFhLpAECIAEhWCBg4zkjhQQfUUAwUfJBVTHLVt0/mZxxaHATqsZ2i8gYfiJYIOWN64/b6Qf33VNoJFVRo0eW99IhXEQMM5uw97Z77M36gljDkQIPSHMV0QIJYWMBATABBG1kb2MaIAwBYXBwbGljYXRpb24vdm5kLmJsdWV0b290aC5sZS5vb2IwCBsoEos3KCgBAhwBXB5YBGlzby5vcmc6MTgwMTM6ZGV2aWNlZW5nYWdlbWVudG1kb2OiAGMxLjABggHYGFhLpAECIAEhWCBaiNGCvOX0LvpZlD8zNZ0uipaP8onZPl+kRLYkNDFn/iJYILFujPhY3cdpBAe6YdTDOCN6jPzz3mqmcvxgpVeqMvxnWM2RAiVIchWRAgJjcgECEQIEYWMBATAAEQIGYWMBA25mYwBRAgRhYwEBVwAaIB4BYXBwbGljYXRpb24vdm5kLmJsdWV0b290aC5sZS5vb2IwCBsoB4CAvygBAhwCEQfIMv/20m+gvrNN/NVV1II6HBEBA2lzby5vcmc6MTgwMTM6bmZjbmZjAVoXKwFhcHBsaWNhdGlvbi92bmQud2ZhLm5hblcDAQEDIwIAEyT+yacLl6yWhKTjJhdu9bmBxehTPl8AKYz8y8NecAprAgQUdW9yZy5pc28uMTgwMTMuNS4xLm1ETNgYQaA=")!
