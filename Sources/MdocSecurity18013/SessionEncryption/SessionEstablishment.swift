@@ -20,6 +20,7 @@ import Foundation
 import SwiftCBOR
 import Logging
 import MdocDataModel18013
+import OrderedCollections
 
 /// The mdoc reader creates the session establishment message.Contains the reader key and the encrypted mdoc request.
 /// The mdoc uses the data from the session establishment message to derive the session keys and decrypt the mdoc request.
@@ -39,10 +40,10 @@ public struct SessionEstablishment {
 
 extension SessionEstablishment: CBORDecodable {
 	public init?(cbor: CBOR) {
-		guard case let .map(values) = cbor else { logger.error("Session establishment data must be a map"); return nil  }
-		guard case let .byteString(bs) = values[CodingKeys.data] else { logger.error("Session establishment missing data"); return nil }
+		guard case let .map(m) = cbor else { logger.error("Session establishment data must be a map"); return nil  }
+		guard case let .byteString(bs) = m[.utf8String(CodingKeys.data.rawValue)] else { logger.error("Session establishment missing data"); return nil }
 		data = bs
-		if let eReaderKey = values[CodingKeys.eReaderKey] {
+		if let eReaderKey = m[.utf8String(CodingKeys.eReaderKey.rawValue)] {
 			guard case let .tagged(tag, value) = eReaderKey else { logger.error("Session establishment eReaderKey must be tagged"); return nil }
 			guard tag == .encodedCBORDataItem else { logger.error("Session establishment eReaderKey tag must be encodedCBOR (24)"); return nil }
 			guard case let .byteString(ebs) = value else { logger.error("eReaderKey value must be byteString"); return nil }
@@ -53,7 +54,7 @@ extension SessionEstablishment: CBORDecodable {
 
 extension SessionEstablishment: CBOREncodable {
 	public func toCBOR(options: CBOROptions) -> CBOR {
-		var res = [CBOR:CBOR]()
+		var res = OrderedDictionary<CBOR, CBOR>()
 		if let eReaderKeyRawData { res[.utf8String(CodingKeys.eReaderKey.rawValue)] = eReaderKeyRawData.taggedEncoded }
 		res[.utf8String(CodingKeys.data.rawValue)] = .byteString(data)
 		return .map(res)
