@@ -53,11 +53,11 @@ public struct MdocAuthentication {
 	///   - deviceNameSpacesRawData: device-name spaces raw data. Usually is a CBOR-encoded empty dictionary
 	///   - bUseDeviceSign: Specify true for device authentication (false is default)
 	/// - Returns: DeviceAuth instance
-	public func getDeviceAuthForTransfer(docType: String, deviceNameSpacesRawData: [UInt8] = [0xA0], bUseDeviceSign: Bool = false) throws -> DeviceAuth? {
+	public func getDeviceAuthForTransfer(docType: String, deviceNameSpacesRawData: [UInt8] = [0xA0], dauthMethod: DeviceAuthMethod) throws -> DeviceAuth? {
 		let da = DeviceAuthentication(sessionTranscript: transcript, docType: docType, deviceNameSpacesRawData: deviceNameSpacesRawData)
 		let contentBytes = da.toCBOR(options: CBOROptions()).taggedEncoded.encode(options: CBOROptions())
 		let coseRes: Cose
-		if bUseDeviceSign {
+		if dauthMethod == .deviceSignature {
 			coseRes = try Cose.makeDetachedCoseSign1(payloadData: Data(contentBytes), deviceKey: authKeys.privateKey, alg: .es256)
 		} else {
             // this is the preferred method
