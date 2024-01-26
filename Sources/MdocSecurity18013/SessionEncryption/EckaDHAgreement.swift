@@ -22,13 +22,19 @@ import MdocDataModel18013
 extension CoseKeyExchange {
 
 	/// Computes a shared secret from the private key and the provided public key from another party.
-	public func makeEckaDHAgreement() -> SharedSecret? {
+	public func makeEckaDHAgreement(inSecureEnclave: Bool) -> SharedSecret? {
 		var sharedSecret: SharedSecret?
 		switch publicKey.crv {
 		case .p256:
 			guard let puk256 = try? P256.KeyAgreement.PublicKey(x963Representation: publicKey.getx963Representation()) else { return nil}
-			guard let prk256 = try? P256.KeyAgreement.PrivateKey(x963Representation: privateKey.getx963Representation()) else { return nil}
-			sharedSecret = try? prk256.sharedSecretFromKeyAgreement(with: puk256)
+			if inSecureEnclave {
+				guard let sOID = privateKey.secureEnclaveKeyID else { logger.error("Missing Private key Secure Enclave ID"); return nil }
+				guard let prk256 = try? SecureEnclave.P256.KeyAgreement.PrivateKey(dataRepresentation: sOID) else { return nil}
+				sharedSecret = try? prk256.sharedSecretFromKeyAgreement(with: puk256)
+			} else {
+				guard let prk256 = try? P256.KeyAgreement.PrivateKey(x963Representation: privateKey.getx963Representation()) else { return nil}
+				sharedSecret = try? prk256.sharedSecretFromKeyAgreement(with: puk256)
+			}
 		case .p384:
 			guard let puk384 = try? P384.KeyAgreement.PublicKey(x963Representation: publicKey.getx963Representation()) else { return nil}
 			guard let prk384 = try? P384.KeyAgreement.PrivateKey(x963Representation: privateKey.getx963Representation()) else { return nil}
