@@ -5,7 +5,6 @@
 **Contents**
 
 - [Properties](#properties)
-  - `ref`
   - `commonName`
   - `subjectSummary`
   - `email`
@@ -16,7 +15,6 @@
   - `debugDescription`
 - [Methods](#methods)
   - `init(ref:)`
-  - `trustIsValid(_:)`
   - `getValidityPeriod()`
   - `getCertInfo(certData:)`
 
@@ -25,12 +23,6 @@ public class CertificateInfo: CustomDebugStringConvertible
 ```
 
 ## Properties
-### `ref`
-
-```swift
-let ref: SecCertificate
-```
-
 ### `commonName`
 
 ```swift
@@ -113,12 +105,6 @@ public var debugDescription: String
 
 ```swift
 public init(ref: SecCertificate)
-```
-
-### `trustIsValid(_:)`
-
-```swift
-func trustIsValid(_ trust: SecTrust) -> Bool
 ```
 
 ### `getValidityPeriod()`

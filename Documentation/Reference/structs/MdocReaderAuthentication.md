@@ -4,8 +4,6 @@
 
 **Contents**
 
-- [Properties](#properties)
-  - `transcript`
 - [Methods](#methods)
   - `validateReaderAuth(readerAuthCBOR:readerAuthCertificate:itemsRequestRawData:rootCerts:)`
   - `init(transcript:)`
@@ -18,13 +16,6 @@ Implements mdoc reader authentication
 
 The data that the mdoc reader authenticates is the ReaderAuthentication structure
 Currently the mdoc side is implemented (verification of reader-auth CBOR data)
-
-## Properties
-### `transcript`
-
-```swift
-let transcript: SessionTranscript
-```
 
 ## Methods
 ### `validateReaderAuth(readerAuthCBOR:readerAuthCertificate:itemsRequestRawData:rootCerts:)`
