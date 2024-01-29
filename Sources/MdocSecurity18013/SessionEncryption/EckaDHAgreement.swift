@@ -29,7 +29,7 @@ extension CoseKeyExchange {
 			guard let puk256 = try? P256.KeyAgreement.PublicKey(x963Representation: publicKey.getx963Representation()) else { return nil}
 			if inSecureEnclave {
 				guard let sOID = privateKey.secureEnclaveKeyID else { logger.error("Missing Private key Secure Enclave ID"); return nil }
-				guard let prk256 = try? SecureEnclave.P256.KeyAgreement.PrivateKey(dataRepresentation: sOID) else { return nil}
+				guard let prk256 = try? SecureEnclave.P256.KeyAgreement.PrivateKey(dataRepresentation: sOID) else { logger.error("Secure Enclave Private Key wrong data representation"); return nil}
 				sharedSecret = try? prk256.sharedSecretFromKeyAgreement(with: puk256)
 			} else {
 				guard let prk256 = try? P256.KeyAgreement.PrivateKey(x963Representation: privateKey.getx963Representation()) else { return nil}
