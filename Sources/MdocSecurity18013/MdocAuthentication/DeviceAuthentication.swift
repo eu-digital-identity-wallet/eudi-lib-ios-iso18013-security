@@ -33,3 +33,8 @@ import MdocDataModel18013
           .array([.utf8String("DeviceAuthentication"), sessionTranscript.toCBOR(options: options), .utf8String(docType), deviceNameSpacesRawData.taggedEncoded])
       }
   }
+
+public enum DeviceAuthMethod: String {
+	case deviceSignature
+	case deviceMac
+}

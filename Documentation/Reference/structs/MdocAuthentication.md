@@ -4,14 +4,9 @@
 
 **Contents**
 
-- [Properties](#properties)
-  - `transcript`
-  - `authKeys`
-  - `sessionTranscriptBytes`
 - [Methods](#methods)
   - `init(transcript:authKeys:)`
-  - `makeMACKeyAggrementAndDeriveKey(deviceAuth:)`
-  - `getDeviceAuthForTransfer(docType:deviceNameSpacesRawData:bUseDeviceSign:)`
+  - `getDeviceAuthForTransfer(docType:deviceNameSpacesRawData:dauthMethod:)`
 
 ```swift
 public struct MdocAuthentication
@@ -27,25 +22,6 @@ Initialized from the session transcript object, the device private key and the r
 let mdocAuth = MdocAuthentication(transcript: sessionEncr.transcript, authKeys: authKeys)
 ```
 
-## Properties
-### `transcript`
-
-```swift
-let transcript: SessionTranscript
-```
-
-### `authKeys`
-
-```swift
-let authKeys: CoseKeyExchange
-```
-
-### `sessionTranscriptBytes`
-
-```swift
-var sessionTranscriptBytes: [UInt8]
-```
-
 ## Methods
 ### `init(transcript:authKeys:)`
 
@@ -53,19 +29,10 @@ var sessionTranscriptBytes: [UInt8]
 public init(transcript: SessionTranscript, authKeys: CoseKeyExchange)
 ```
 
-### `makeMACKeyAggrementAndDeriveKey(deviceAuth:)`
+### `getDeviceAuthForTransfer(docType:deviceNameSpacesRawData:dauthMethod:)`
 
 ```swift
-func makeMACKeyAggrementAndDeriveKey(deviceAuth: DeviceAuthentication) throws -> SymmetricKey?
-```
-
-Calculate the ephemeral MAC key, by performing ECKA-DH (Elliptic Curve Key Agreement Algorithm – Diffie-Hellman)
-The inputs shall be the SDeviceKey.Priv and EReaderKey.Pub for the mdoc and EReaderKey.Priv and SDeviceKey.Pub for the mdoc reader.
-
-### `getDeviceAuthForTransfer(docType:deviceNameSpacesRawData:bUseDeviceSign:)`
-
-```swift
-public func getDeviceAuthForTransfer(docType: String, deviceNameSpacesRawData: [UInt8] = [0xA0], bUseDeviceSign: Bool = false) throws -> DeviceAuth?
+public func getDeviceAuthForTransfer(docType: String, deviceNameSpacesRawData: [UInt8] = [0xA0], dauthMethod: DeviceAuthMethod) throws -> DeviceAuth?
 ```
 
 Generate a ``DeviceAuth`` structure used for mdoc-authentication

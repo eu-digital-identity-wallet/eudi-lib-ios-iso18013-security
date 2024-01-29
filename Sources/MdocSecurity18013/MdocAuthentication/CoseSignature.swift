@@ -19,21 +19,24 @@ import CryptoKit
 import MdocDataModel18013
 
 extension Cose {
-	public static func makeDetachedCoseSign1(payloadData: Data, deviceKey: CoseKeyPrivate, alg: Cose.VerifyAlgorithm) throws-> Cose {
-		return try makeDetachedCoseSign1(payloadData: payloadData, deviceKey_x963: deviceKey.getx963Representation(), alg: alg)
-	}
-	
 	/// Create a detached COSE-Sign1 structure according to https://datatracker.ietf.org/doc/html/rfc8152#section-4.4
 	/// - Parameters:
 	///   - payloadData: Payload to be signed
-	///   - deviceKey_x963: static device private key (encoded with ANSI x.963)
+	///   - deviceKey: static device private key (encoded with ANSI x.963 or stored in SE)
 	///   - alg: The algorithm to sign with
 	/// - Returns: a detached COSE-Sign1 structure
-	public static func makeDetachedCoseSign1(payloadData: Data, deviceKey_x963: Data, alg: Cose.VerifyAlgorithm) throws -> Cose {
+	public static func makeDetachedCoseSign1(payloadData: Data, deviceKey: CoseKeyPrivate, alg: Cose.VerifyAlgorithm) throws-> Cose {
 		let coseIn = Cose(type: .sign1, algorithm: alg.rawValue, payloadData: payloadData)
 		let dataToSign = coseIn.signatureStruct!
+		let signature: Data
+		if let keyID = deviceKey.secureEnclaveKeyID {
+			let signingKey = try SecureEnclave.P256.Signing.PrivateKey(dataRepresentation: keyID)
+			signature = (try! signingKey.signature(for: dataToSign)).rawRepresentation
+		} else {
+			signature = try computeSignatureValue(dataToSign, deviceKey_x963: deviceKey.getx963Representation(), alg: alg)
+		}
 		// return COSE_SIGN1 struct
-		return Cose(type: .sign1, algorithm: alg.rawValue, signature: try computeSignatureValue(dataToSign, deviceKey_x963: deviceKey_x963, alg: alg))
+		return Cose(type: .sign1, algorithm: alg.rawValue, signature: signature)
 	}
 	
 	/// Generates an Elliptic Curve Digital Signature Algorithm (ECDSA) signature of the provide data over an elliptic curve. Apple Crypto implementation is used

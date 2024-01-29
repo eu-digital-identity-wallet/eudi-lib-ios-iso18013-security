@@ -54,16 +54,10 @@ Computes a message authenticated code for the data
 public static func makeDetachedCoseSign1(payloadData: Data, deviceKey: CoseKeyPrivate, alg: Cose.VerifyAlgorithm) throws-> Cose
 ```
 
-### `makeDetachedCoseSign1(payloadData:deviceKey_x963:alg:)`
-
-```swift
-public static func makeDetachedCoseSign1(payloadData: Data, deviceKey_x963: Data, alg: Cose.VerifyAlgorithm) throws -> Cose
-```
-
 Create a detached COSE-Sign1 structure according to https://datatracker.ietf.org/doc/html/rfc8152#section-4.4
 - Parameters:
   - payloadData: Payload to be signed
-  - deviceKey_x963: static device private key (encoded with ANSI x.963)
+  - deviceKey: static device private key (encoded with ANSI x.963 or stored in SE)
   - alg: The algorithm to sign with
 - Returns: a detached COSE-Sign1 structure
 
@@ -72,7 +66,7 @@ Create a detached COSE-Sign1 structure according to https://datatracker.ietf.org
 | Name | Description |
 | ---- | ----------- |
 | payloadData | Payload to be signed |
-| deviceKey_x963 | static device private key (encoded with ANSI x.963) |
+| deviceKey | static device private key (encoded with ANSI x.963 or stored in SE) |
 | alg | The algorithm to sign with |
 
 ### `computeSignatureValue(_:deviceKey_x963:alg:)`

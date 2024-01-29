@@ -88,7 +88,8 @@ final class MdocSecurity18013Tests: XCTestCase {
         let authKeys = CoseKeyExchange(publicKey: Self.AnnexdTestData.d51_ephReaderKey.key, privateKey: Self.AnnexdTestData.d53_deviceKey)
         let mdocAuth = MdocAuthentication(transcript: sessionEncr.transcript, authKeys: authKeys)
 		let bUseDeviceSign = UserDefaults.standard.bool(forKey: "PreferDeviceSignature")
-		let deviceAuth = try XCTUnwrap(try mdocAuth.getDeviceAuthForTransfer(docType: "org.iso.18013.5.1.mDL", deviceNameSpacesRawData: [0xA0], bUseDeviceSign: bUseDeviceSign))
+		let deviceAuth = try XCTUnwrap(try mdocAuth.getDeviceAuthForTransfer(docType: "org.iso.18013.5.1.mDL", deviceNameSpacesRawData: [0xA0], 
+            dauthMethod: bUseDeviceSign ? .deviceSignature : .deviceMac))
         let ourDeviceAuthCBORbytes = deviceAuth.encode(options: CBOROptions())
         XCTAssertEqual(Data(ourDeviceAuthCBORbytes), AnnexdTestData.d53_deviceAuthCBORdata)
     }
