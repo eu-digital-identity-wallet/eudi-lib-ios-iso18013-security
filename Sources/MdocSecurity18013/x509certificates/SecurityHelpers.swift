@@ -33,7 +33,7 @@ public enum NotAllowedExtension: String, CaseIterable {
     let x509test = try? X509Certificate(der: secData)
     guard let x509test, let notAfter = x509test.notAfter, let notBefore = x509test.notBefore else { return (false,"Missing certificate for \(usage)", nil) }
     guard !ASN1Object.hasDuplicateExtensions(der: secData) else { return (false, "Duplicate extensions in Certificate", nil) }
-    guard x509test.serialNumber != nil else { return (false, "Missing Serial number", nil) }
+		guard let sn = x509test.serialNumber else { return (false, "Missing Serial number", nil) }
     let valDays = Calendar.current.dateComponents([.day], from: notBefore, to: notAfter).day
     guard x509test.checkValidity(Self.now()) else { return (false,"Current date not in validity period of Reader Certificate", nil) }
     guard let valDays, valDays > 0 && valDays <= maxValPeriod else { return (false,"'Not after' maximum of \(maxValPeriod) days after 'Not before'", nil) }
@@ -69,6 +69,21 @@ public enum NotAllowedExtension: String, CaseIterable {
           guard let x509root2 = try? X509ExtAltName2(der: SecCertificateCopyData(cert) as Data) else { return (false, "Issuer root data not in cert.", nil) }
           guard let dictAltNamesRoot = x509root2.issuerAlternativeNamesAndTypes, dictAltNamesRoot == dictAltNames else { return (false, "Issuer data rfc822Name or uniformResourceIdentifier do not match with root cert.", nil) }
         }
+				if checkCrl {
+					// Get the CRL Distribution Points extension, which is at OID 2.5.29.31
+					//let rev = RevocationTrustEvaluator(performDefaultValidation: false, validateHost: false, options: [.crl, .requirePositiveResponse])  do { try rev.evaluate(trust2, forHost: "") }
+					if let test_sn = x509test.serialNumber, let root_sn = x509root.serialNumber, test_sn == root_sn { continue }
+					if let ext = x509root.extensionObject(oid: .cRLDistributionPoints) as? X509Certificate.CRLDistributionPointsExtension, let crls = ext.crls {
+						for crl in crls {
+							guard let crlUrl = URL(string: crl) else { continue }
+							guard let crlData = try? Data(contentsOf: crlUrl) else { continue }
+							let crl = try? X509CRL(pem: crlData);  let bs = crl?.badSerials
+							if let bs, bs.contains(sn) { return (false,"Revoked Certificate for \(usage)", cert)}
+							if let bs, let snr = x509root.serialNumber, bs.contains(snr) { return (false,"Revoked Root Certificate", cert)}
+						}
+					}
+				}
+				return (true, "Certificate match with root cert \(x509root.subjectDistinguishedName ?? "N/A")", cert)
       }
     } // next
     return (false, "Certificate not matched with root certificates", nil)

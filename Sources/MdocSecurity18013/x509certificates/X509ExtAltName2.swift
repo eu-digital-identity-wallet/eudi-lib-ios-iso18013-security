@@ -42,11 +42,6 @@ public class X509ExtAltName2 {
     }
 }
 
-public enum X509CRLError: Error {
-    case parseError
-    case outOfBuffer
-}
-
 public class X509ExtensionAltName2 {
 
     let block: ASN1Object
