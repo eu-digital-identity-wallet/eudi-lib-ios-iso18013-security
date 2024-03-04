@@ -1,18 +1,7 @@
 import Foundation
 import ASN1Decoder
 
-extension ASN1Object {
-  var subLast: ASN1Object? { subCount() == 0 ? nil : sub(subCount()-1) }
-  
-  static func hasDuplicateExtensions(der: Data) -> Bool {
-    guard let asn1 = try? ASN1DERDecoder.decode(data: der) else {return false }
-    guard asn1.count > 0, let block1 = asn1.first?.sub(0) else { return false }
-    guard let asn1pos7 = block1.sub(7)?.sub(0) else { return false }
-    let extensionBlocks = (0..<asn1pos7.subCount()).map { asn1pos7.sub($0) }
-    let extensionsOids = extensionBlocks.compactMap { $0?.sub(0)?.value as? String }
-    return Set(extensionsOids).count < extensionsOids.count
-  }
-}
+
 
 public class X509ExtAltName2 {
     private let asn1: [ASN1Object]
@@ -94,4 +83,17 @@ public class X509ExtensionAltName2 {
         }
         return nil
     }
+}
+
+extension ASN1Object {
+	var subLast: ASN1Object? { subCount() == 0 ? nil : sub(subCount()-1) }
+	
+	static func hasDuplicateExtensions(der: Data) -> Bool {
+		guard let asn1 = try? ASN1DERDecoder.decode(data: der) else {return false }
+		guard asn1.count > 0, let block1 = asn1.first?.sub(0) else { return false }
+		guard let asn1pos7 = block1.sub(7)?.sub(0) else { return false }
+		let extensionBlocks = (0..<asn1pos7.subCount()).map { asn1pos7.sub($0) }
+		let extensionsOids = extensionBlocks.compactMap { $0?.sub(0)?.value as? String }
+		return Set(extensionsOids).count < extensionsOids.count
+	}
 }
