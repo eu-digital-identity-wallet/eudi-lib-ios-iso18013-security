@@ -48,6 +48,11 @@ guard let readerAuthRawCBOR = docR.readerAuthRawCBOR else { continue }
 let b = try mdocAuth.validateReaderAuth(readerAuthCBOR: readerAuthRawCBOR, readerAuthCertificate: docR.readerCertificate!, itemsRequestRawData: docR.itemsRequestRawData!)
 ```
 
+## Dependencies (to other libs)
+
+* ASN1 DER Decoder for X.509 Certificate [ASN1Decoder](https://github.com/filom/ASN1Decoder)
+* A Logging API for Swift: [swift-log](https://github.com/apple/swift-log)
+
 ## Reference
 Detailed documentation is provided [here](Documentation/Reference/README.md) 
 
