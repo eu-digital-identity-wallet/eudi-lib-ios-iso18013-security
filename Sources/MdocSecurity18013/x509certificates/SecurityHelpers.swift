@@ -18,11 +18,17 @@ public enum NotAllowedExtension: String, CaseIterable {
 public class SecurityHelpers {
 	public static var nonAllowedExtensions: [String] = NotAllowedExtension.allCases.map(\.rawValue)
 	
-	public static func now() -> Date { if #available(iOS 15, macOS 12, watchOS 8, *) {
-		return Date.now
-	} else {
-		return Date()
-	} }
+	public static func getPublicKeyx963(publicCertData: Data) -> Data? {
+	guard let sc = SecCertificateCreateWithData(nil, Data(publicCertData) as CFData) else { return nil }
+	return getPublicKeyx963(ref: sc)
+}
+
+public static func getPublicKeyx963(ref: SecCertificate) -> Data? {
+	guard let secKey = SecCertificateCopyKey(ref) else { return nil }
+	var error: Unmanaged<CFError>?
+	guard let repr = SecKeyCopyExternalRepresentation(secKey, &error) else { return nil }
+	return repr as Data
+}
 	
 	public static var ecdsaAlgOIDs: [String] { [OID.ecdsaWithSHA256.rawValue, "1.2.840.10045.4.3.3", OID.ecdsaWithSHA512.rawValue ] }
 	
@@ -35,7 +41,7 @@ public class SecurityHelpers {
 		guard !ASN1Object.hasDuplicateExtensions(der: secData) else { return (false, "Duplicate extensions in Certificate", nil) }
 		guard let sn = x509test.serialNumber else { return (false, "Missing Serial number", nil) }
 		let valDays = Calendar.current.dateComponents([.day], from: notBefore, to: notAfter).day
-		guard x509test.checkValidity(Self.now()) else { return (false,"Current date not in validity period of Reader Certificate", nil) }
+		guard x509test.checkValidity(Date()) else { return (false,"Current date not in validity period of Reader Certificate", nil) }
 		guard let valDays, valDays > 0 else { return (false,"Invalid validity period", nil) }
 		guard let cn = x509test.subject(oid: .commonName), cn.first != nil else { return (false, "Missing Common Name of Reader Certificate", nil) }
 		let (errAlt, dictAltNames) = if usage == .mdocReaderAuth { getAlternativeNames(secCert, x509test) } else { (nil,[:]) }
@@ -48,7 +54,7 @@ public class SecurityHelpers {
 			let serverTrustIsValid = trustIsValid(trust)
 			if serverTrustIsValid {
 				guard let x509root = try? X509Certificate(der: SecCertificateCopyData(cert) as Data), x509root.notAfter != nil, x509root.notBefore != nil else { return (false, "Bad root certificate", cert) }
-				guard x509root.checkValidity(Self.now()) else { return (false,"Current date not in validity period of Reader Root Certificate", nil) }
+				guard x509root.checkValidity(Date()) else { return (false,"Current date not in validity period of Reader Root Certificate", nil) }
 				if usage == .mdocReaderAuth {
 					guard let x509root2 = try? X509ExtAltName2(der: SecCertificateCopyData(cert) as Data) else { return (false, "Issuer root data not in cert.", nil) }
 					guard let dictAltNamesRoot = x509root2.issuerAlternativeNamesAndTypes, dictAltNamesRoot == dictAltNames else { return (false, "Issuer data rfc822Name or uniformResourceIdentifier do not match with root cert.", nil) }
