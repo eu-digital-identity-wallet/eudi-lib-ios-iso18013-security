@@ -14,7 +14,6 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/eu-digital-identity-wallet/eudi-lib-ios-iso18013-data-model.git", .upToNextMajor(from: "0.1.0")), 
-        .package(url: "https://github.com/filom/ASN1Decoder", from: "1.8.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.5.3"),
         .package(url: "https://github.com/apple/swift-certificates.git", .upToNextMajor(from: "1.0.0"))
     ],
@@ -24,8 +23,7 @@ let package = Package(
         .target(
             name: "MdocSecurity18013", dependencies: [
                 .product(name: "MdocDataModel18013", package: "eudi-lib-ios-iso18013-data-model"), 
-                "ASN1Decoder",
-                .product(name: "Logging", package: "swift-log"),
+                 .product(name: "Logging", package: "swift-log"),
                  .product(name: "X509", package: "swift-certificates"),
                 ]),
         .testTarget(

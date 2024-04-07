@@ -26,13 +26,21 @@ final class CertificateHandlingTests: XCTestCase {
 
     override func setUpWithError() throws {
         try super.setUpWithError()
-        certData = try Data(contentsOf: Bundle.module.url(forResource: "ul_cert_iaca_01", withExtension: "crt")!)
+        certData = try Data(contentsOf: Bundle.module.url(forResource: "scytales_mdoc_reader_authentication", withExtension: "der")!)
     }
 
     func testCertificateParsing() throws {
         let cert = try X509.Certificate(derEncoded: [UInt8](certData))
-        XCTAssertNotNil(cert)
+			print(cert.subject.description)
+        print(SecurityHelpers.verifyReaderAuthCert(cert))
     }
+
+    func testCRLParsing() throws {
+        let pemStr = try String(contentsOf: Bundle.module.url(forResource: "scytales", withExtension: "crl")!)
+        let crl = try CRL(pemEncoded: pemStr)
+				print(crl.revokedSerials.map(\.description))
+    }
+
 
     
 }

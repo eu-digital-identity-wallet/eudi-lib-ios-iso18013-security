@@ -1,15 +1,6 @@
 {
   "pins" : [
     {
-      "identity" : "asn1decoder",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/filom/ASN1Decoder",
-      "state" : {
-        "revision" : "7e1523662c69d019a3299bbfb22fb824141dd1f6",
-        "version" : "1.10.0"
-      }
-    },
-    {
       "identity" : "eudi-lib-ios-iso18013-data-model",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/eu-digital-identity-wallet/eudi-lib-ios-iso18013-data-model.git",
