@@ -26,21 +26,22 @@ final class CertificateHandlingTests: XCTestCase {
 
     override func setUpWithError() throws {
         try super.setUpWithError()
-        certData = try Data(contentsOf: Bundle.module.url(forResource: "scytales_mdoc_reader_authentication", withExtension: "der")!)
+        certData = try Data(contentsOf: Bundle.module.url(forResource: "owf_identity_credential_reader_cert", withExtension: "der")!)
     }
 
-    func testCertificateParsing() throws {
-        let cert = try X509.Certificate(derEncoded: [UInt8](certData))
-			print(cert.subject.description)
-        print(SecurityHelpers.verifyReaderAuthCert(cert))
-    }
+	func testReaderCertificateValidations() throws {
+		let certObj = try X509.Certificate(derEncoded: [UInt8](certData))
+		print("Certificate subject:", certObj.subject.description)
+		let cert = try XCTUnwrap(SecCertificateCreateWithData(nil, certData as CFData))
+		let (isValid, messages, _) = SecurityHelpers.isMdocCertificateValid(secCert: cert, usage: .mdocReaderAuth, rootCerts: [])
+		XCTAssert(!isValid) // no root certs given
+		print("Validation messages", messages)
+	}
+	
+	func testCRLParsing() throws {
+		let pemStr = try String(contentsOf: Bundle.module.url(forResource: "test", withExtension: "crl")!)
+		let crl = try CRL(pemEncoded: pemStr)
+		print(crl.revokedSerials.map(\.description))
+	}
 
-    func testCRLParsing() throws {
-        let pemStr = try String(contentsOf: Bundle.module.url(forResource: "scytales", withExtension: "crl")!)
-        let crl = try CRL(pemEncoded: pemStr)
-				print(crl.revokedSerials.map(\.description))
-    }
-
-
-    
 }

@@ -43,8 +43,8 @@ public struct MdocReaderAuthentication {
         let b1 = try readerAuth.validateDetachedCoseSign1(payloadData: Data(contentBytes), publicKey_x963: publicKeyx963)
 		guard let rootCerts else { return (b1, nil) }
 		let b2 = SecurityHelpers.isMdocCertificateValid(secCert: sc, usage: .mdocReaderAuth, rootCerts: rootCerts)
-		if !b2.isValid { logger.log(level: .info, Logger.Message(unicodeScalarLiteral: b2.reason ?? "")) }
-		return (b1, b2.reason)
+		if !b2.isValid { logger.warning(Logger.Message(unicodeScalarLiteral: b2.validationMessages.joined(separator: "\n"))) }
+		return (b1, b2.validationMessages.joined(separator: "\n"))
 	}
 	
 	public init(transcript: SessionTranscript) {
