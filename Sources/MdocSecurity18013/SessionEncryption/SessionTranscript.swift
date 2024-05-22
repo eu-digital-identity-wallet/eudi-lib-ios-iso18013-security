@@ -28,8 +28,13 @@ public struct SessionTranscript {
 	let eReaderRawData: [UInt8]?
 	// handover object
 	let handOver: CBOR
+		
+	public init(devEngRawData: [UInt8]? = nil, eReaderRawData: [UInt8]? = nil, handOver: CBOR) {
+		self.devEngRawData = devEngRawData
+		self.eReaderRawData = eReaderRawData
+		self.handOver = handOver
+	}
 }
-
 #if DEBUG
 // initializer used for tests only
 extension SessionTranscript: CBORDecodable {
