@@ -54,7 +54,7 @@ let b = try mdocAuth.validateReaderAuth(readerAuthCBOR: readerAuthRawCBOR, reade
 * A Logging API for Swift: [swift-log](https://github.com/apple/swift-log)
 
 ## Reference
-Detailed documentation is provided [here](Documentation/Reference/README.md) 
+Detailed documentation is provided [here](https://eu-digital-identity-wallet.github.io/eudi-lib-ios-iso18013-security/documentation/mdocsecurity18013/) 
 
 ### Disclaimer
 The released software is a initial development release version: 
