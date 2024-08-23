@@ -21,10 +21,12 @@ Implementation of mDoc security according to [ISO/IEC 18013-5](https://www.iso.o
 Session encryption uses standard ephemeral key ECDH to establish session keys for authenticated symmetric encryption.
 The ``SessionEncryption`` struct implements session encryption (for the mDoc currently)
 It is initialized from 
-* the session establishment data received from the mdoc reader.
-* the device engagement data generated from the mdoc.
-* the handover data.
- 
+<ol>
+ <li> the session establishment data received from the mdoc reader. </li>
+ <li> the device engagement data generated from the mdoc. </li>
+ <li> the handover data. </li>
+</ol>
+
 ```swift
 var sessionEncr = SessionEncryption(se: sessionEstablishmentObject, de: deviceEngagementObject, handOver: handOverObject)
 let data = try sessionEncr.decrypt(sessionEstablishmentObject.data)!
