@@ -21,7 +21,7 @@ import MdocDataModel18013
 import SwiftCBOR
 
 /// SessionTranscript = [DeviceEngagementBytes,EReaderKeyBytes,Handover]
-public struct SessionTranscript {
+public struct SessionTranscript: Sendable {
 	/// device engagement bytes (NOT tagged)
 	let devEngRawData: [UInt8]?
 	/// reader key bytes ( NOT tagged)

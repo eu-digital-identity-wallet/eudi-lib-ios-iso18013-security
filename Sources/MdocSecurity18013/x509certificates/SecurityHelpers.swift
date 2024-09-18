@@ -20,12 +20,12 @@ import CryptoKit
 import X509
 import SwiftASN1
 
-public enum CertificateUsage {
+public enum CertificateUsage: Sendable {
 	case mdocAuth
 	case mdocReaderAuth
 }
 
-public enum NotAllowedExtension: String, CaseIterable {
+public enum NotAllowedExtension: String, CaseIterable, Sendable {
 	case policyMappings = "2.5.29.33"
 	case nameConstraints = "2.5.29.30"
 	case policyConstraints = "2.5.29.36"
@@ -34,7 +34,7 @@ public enum NotAllowedExtension: String, CaseIterable {
 }
 
 public class SecurityHelpers {
-	public static var nonAllowedExtensions: [String] = NotAllowedExtension.allCases.map(\.rawValue)
+	public static let nonAllowedExtensions: [String] = NotAllowedExtension.allCases.map(\.rawValue)
 	
 	public static func getPublicKeyx963(publicCertData: Data) -> Data? {
 		guard let sc = SecCertificateCreateWithData(nil, Data(publicCertData) as CFData) else { return nil }

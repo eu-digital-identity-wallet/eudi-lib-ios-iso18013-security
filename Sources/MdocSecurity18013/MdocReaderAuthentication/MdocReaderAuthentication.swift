@@ -24,7 +24,7 @@ import SwiftCBOR
 ///
 /// The data that the mdoc reader authenticates is the ReaderAuthentication structure
 /// Currently the mdoc side is implemented (verification of reader-auth CBOR data)
-public struct MdocReaderAuthentication {
+public struct MdocReaderAuthentication: Sendable {
 
     let transcript: SessionTranscript
 	
