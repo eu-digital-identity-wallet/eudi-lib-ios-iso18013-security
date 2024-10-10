@@ -24,7 +24,7 @@ struct CRL: PEMParseable, DERParseable {
 	var validity: UTCTime
 	var subject: UTCTime
 	var revokedSerials: [CRLSerialInfo] = []
-	static var defaultPEMDiscriminator: String = "X509 CRL"
+	static let defaultPEMDiscriminator: String = "X509 CRL"
 	
 	struct CRLSerialInfo: DERImplicitlyTaggable, CustomStringConvertible {
 		let serial: Certificate.SerialNumber // ArraySlice<UInt8>
@@ -37,7 +37,7 @@ struct CRL: PEMParseable, DERParseable {
 			date = try UTCTime(derEncoded: &nodesIter)
 		}
 		
-		static var defaultIdentifier: SwiftASN1.ASN1Identifier = .sequence
+		static let defaultIdentifier: SwiftASN1.ASN1Identifier = .sequence
 		func serialize(into coder: inout SwiftASN1.DER.Serializer, withIdentifier identifier: SwiftASN1.ASN1Identifier) throws { } // not used
 		var description: String { serial.description }
 	}

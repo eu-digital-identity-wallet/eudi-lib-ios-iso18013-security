@@ -21,8 +21,7 @@ import MdocDataModel18013
 import CryptoKit
 
 /// Utility functions that can be used for issuer authentication
-public struct IssuerAuthentication {
-	public static var isoDateFormatter: ISO8601DateFormatter = {let df = ISO8601DateFormatter(); df.formatOptions = [.withFullDate, .withTime, .withTimeZone, .withColonSeparatorInTime, .withDashSeparatorInDate]; return df}()
+public struct IssuerAuthentication: Sendable {
 
 	/// Calculate has of data according to a hash algorithm
 	/// - Parameters:

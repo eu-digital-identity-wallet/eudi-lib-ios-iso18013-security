@@ -24,7 +24,7 @@ import OrderedCollections
 
 /// The mdoc reader creates the session establishment message.Contains the reader key and the encrypted mdoc request.
 /// The mdoc uses the data from the session establishment message to derive the session keys and decrypt the mdoc request.
-public struct SessionEstablishment {
+public struct SessionEstablishment: Sendable {
 	public var eReaderKeyRawData: [UInt8]?
 	public let data: [UInt8]
 	

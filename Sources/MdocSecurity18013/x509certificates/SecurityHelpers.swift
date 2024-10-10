@@ -20,12 +20,12 @@ import CryptoKit
 import X509
 import SwiftASN1
 
-public enum CertificateUsage {
+public enum CertificateUsage: Sendable {
 	case mdocAuth
 	case mdocReaderAuth
 }
 
-public enum NotAllowedExtension: String, CaseIterable {
+public enum NotAllowedExtension: String, CaseIterable, Sendable {
 	case policyMappings = "2.5.29.33"
 	case nameConstraints = "2.5.29.30"
 	case policyConstraints = "2.5.29.36"
@@ -34,7 +34,7 @@ public enum NotAllowedExtension: String, CaseIterable {
 }
 
 public class SecurityHelpers {
-	public static var nonAllowedExtensions: [String] = NotAllowedExtension.allCases.map(\.rawValue)
+	public static let nonAllowedExtensions: [String] = NotAllowedExtension.allCases.map(\.rawValue)
 	
 	public static func getPublicKeyx963(publicCertData: Data) -> Data? {
 		guard let sc = SecCertificateCreateWithData(nil, Data(publicCertData) as CFData) else { return nil }
@@ -48,44 +48,44 @@ public class SecurityHelpers {
 		return repr as Data
 	}
 	
-	public static func isMdocCertificateValid(secCert: SecCertificate, usage: CertificateUsage, rootCerts: [SecCertificate]) -> (isValid:Bool, validationMessages: [String], rootCert: SecCertificate?) {
+	public static func isMdocX5cValid(secCerts: [SecCertificate], usage: CertificateUsage, rootCerts: [SecCertificate]) -> (isValid:Bool, validationMessages: [String], rootCert: SecCertificate?) {
 		let now = Date(); var messages = [String]()
-		var trust: SecTrust?; let policy = SecPolicyCreateBasicX509(); _ = SecTrustCreateWithCertificates(secCert, policy, &trust)
+		var trust: SecTrust?; let policy = SecPolicyCreateBasicX509(); _ = SecTrustCreateWithCertificates(secCerts as CFArray, policy, &trust)
 		guard let trust else { return (false, ["Not valid certificate for \(usage)"], nil) }
 		// convert to swift-certificates object
+		guard let secCert = secCerts.first else { return (false, ["Certificate not found"], nil) }
 		let secData: Data = SecCertificateCopyData(secCert) as Data
-		guard let x509test = try? X509.Certificate(derEncoded: [UInt8](secData)) else { return (false,["Not valid certificate for \(usage)"], nil) }
-		guard x509test.notValidBefore <= now, now <= x509test.notValidAfter else { return (false, ["Current date not in validity period of Certificate"], nil) }
-		let valDays = Calendar.current.dateComponents([.day], from: x509test.notValidBefore, to: x509test.notValidAfter).day
+		guard let x509cert = try? X509.Certificate(derEncoded: [UInt8](secData)) else { return (false,["Not valid certificate for \(usage)"], nil) }
+		guard x509cert.notValidBefore <= now, now <= x509cert.notValidAfter else { return (false, ["Current date not in validity period of Certificate"], nil) }
+		let valDays = Calendar.current.dateComponents([.day], from: x509cert.notValidBefore, to: x509cert.notValidAfter).day
 		guard let valDays, valDays > 0 else { return (false, ["Invalid validity period"], nil) }
-		guard !x509test.subject.isEmpty, let cn = getCommonName(ref: secCert), !cn.isEmpty else { return (false, ["Missing Common Name of Reader Certificate"], nil) }
-		guard !x509test.signature.description.isEmpty else { return (false, ["Missing Signature data"], nil) }
-		if x509test.serialNumber.description.isEmpty { messages.append("Missing Serial number") }
+		guard !x509cert.subject.isEmpty, let cn = getCommonName(ref: secCert), !cn.isEmpty else { return (false, ["Missing Common Name of Reader Certificate"], nil) }
+		guard !x509cert.signature.description.isEmpty else { return (false, ["Missing Signature data"], nil) }
+		if x509cert.serialNumber.description.isEmpty { messages.append("Missing Serial number") }
 		// not critical errors below
-		if x509test.hasDuplicateExtensions() { messages.append("Duplicate extensions in Certificate") }
+		if x509cert.hasDuplicateExtensions() { messages.append("Duplicate extensions in Certificate") }
 		if usage == .mdocReaderAuth {
-			verifyReaderAuthCert(x509test, messages: &messages)
-			if let gns = x509test.getSubjectAlternativeNames(), let gn = gns.first(where: { switch $0 { case .rfc822Name(_): true; case .uniformResourceIdentifier(_): true;  default: false } }) { logger.info("Alternative name \(gn.description)")}
+			verifyReaderAuthCert(x509cert, messages: &messages)
+			if let gns = x509cert.getSubjectAlternativeNames(), let gn = gns.first(where: { switch $0 { case .rfc822Name(_): true; case .uniformResourceIdentifier(_): true;  default: false } }) { logger.info("Alternative name \(gn.description)")}
 		}
 		SecTrustSetPolicies(trust, policy)
-		for cert in rootCerts {
-			let certArray = [cert]
+		for rootCert in rootCerts {
+			let certArray = [rootCert]
 			SecTrustSetAnchorCertificates(trust, certArray as CFArray)
 			SecTrustSetAnchorCertificatesOnly(trust, true)
 			let serverTrustIsValid = trustIsValid(trust)
 			if serverTrustIsValid {
-				guard let x509root = try? X509.Certificate(derEncoded: [UInt8](SecCertificateCopyData(cert) as Data)) else { return (false, ["Bad root certificate"], cert) }
+				guard let x509root = try? X509.Certificate(derEncoded: [UInt8](SecCertificateCopyData(rootCert) as Data)) else { return (false, ["Bad root certificate"], rootCert) }
 				guard x509root.notValidBefore <= now, now <= x509root.notValidAfter else { return (false, ["Current date not in validity period of Reader Root Certificate"], nil) }
-				if usage == .mdocReaderAuth, let rootGns = x509root.getSubjectAlternativeNames(), let gns = x509test.getSubjectAlternativeNames() {
+				if usage == .mdocReaderAuth, let rootGns = x509root.getSubjectAlternativeNames(), let gns = x509cert.getSubjectAlternativeNames() {
 					guard gns.elementsEqual(rootGns) else { return (false, ["Issuer data rfc822Name or uniformResourceIdentifier do not match with root cert."], nil) }
 				}
-				if x509test.serialNumber == x509root.serialNumber { continue }
 				let bs = fetchCRLSerialNumbers(x509root)
 				if !bs.isEmpty {
-					if bs.contains(x509test.serialNumber) { return (false, ["Revoked Certificate for \(cn)"], cert)}
-					if bs.contains(x509root.serialNumber) { return (false,["Revoked Root Certificate for \(getCommonName(ref: cert) ?? "")"], cert)}
+					if bs.contains(x509cert.serialNumber) { return (false, ["Revoked issued Certificate"], rootCert)}
+					if bs.contains(x509root.serialNumber) { return (false,["Revoked Root Certificate"], rootCert)}
 				}
-				return (true, messages, cert)
+				return (true, messages, rootCert)
 			}
 		} // next
 		messages.insert("Certificate not matched with root certificates", at: 0	)
@@ -95,6 +95,7 @@ public class SecurityHelpers {
 	public static func trustIsValid(_ trust: SecTrust) -> Bool {
 		var error: CFError?
 		let isValid = SecTrustEvaluateWithError(trust, &error)
+		if let error { logger.error("Error evaluating trust: \(error)") }
 		return isValid
 	}
 	

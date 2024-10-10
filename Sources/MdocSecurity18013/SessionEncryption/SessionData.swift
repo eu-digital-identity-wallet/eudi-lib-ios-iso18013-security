@@ -21,7 +21,7 @@ import Logging
 import OrderedCollections
 
 /// Message data transfered between mDL and mDL reader
-public struct SessionData {
+public struct SessionData: Sendable {
 	
 	public let data: [UInt8]?
 	public let status: UInt64?

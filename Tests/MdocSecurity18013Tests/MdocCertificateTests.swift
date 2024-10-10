@@ -33,7 +33,7 @@ final class CertificateHandlingTests: XCTestCase {
 		let certObj = try X509.Certificate(derEncoded: [UInt8](certData))
 		print("Certificate subject:", certObj.subject.description)
 		let cert = try XCTUnwrap(SecCertificateCreateWithData(nil, certData as CFData))
-		let (isValid, messages, _) = SecurityHelpers.isMdocCertificateValid(secCert: cert, usage: .mdocReaderAuth, rootCerts: [])
+		let (isValid, messages, _) = SecurityHelpers.isMdocX5cValid(secCerts: [cert], usage: .mdocReaderAuth, rootCerts: [])
 		XCTAssert(!isValid) // no root certs given
 		print("Validation messages", messages)
 	}
