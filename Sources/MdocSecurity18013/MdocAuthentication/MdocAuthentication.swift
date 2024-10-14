@@ -28,7 +28,7 @@ import SwiftCBOR
 /// ```swift
 /// let mdocAuth = MdocAuthentication(transcript: sessionEncr.transcript, authKeys: authKeys)
 /// ```
-public struct MdocAuthentication {
+public struct MdocAuthentication: Sendable {
 	
     let transcript: SessionTranscript
     let authKeys: CoseKeyExchange

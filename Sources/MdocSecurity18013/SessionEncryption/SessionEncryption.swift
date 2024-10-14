@@ -26,7 +26,7 @@ import SwiftCBOR
 /// ```swift
 /// var se = SessionEncryption(se: sessionEstablishmentObject, de: deviceEngagementObject, handOver: handOverObject)
 /// ```
-public struct SessionEncryption {
+public struct SessionEncryption: Sendable {
 	public let sessionRole: SessionRole
 	var sessionCounter: UInt32 = 1
 	var errorCode: UInt?

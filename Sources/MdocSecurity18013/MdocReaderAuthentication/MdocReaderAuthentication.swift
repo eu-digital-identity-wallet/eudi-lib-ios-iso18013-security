@@ -24,7 +24,7 @@ import SwiftCBOR
 ///
 /// The data that the mdoc reader authenticates is the ReaderAuthentication structure
 /// Currently the mdoc side is implemented (verification of reader-auth CBOR data)
-public struct MdocReaderAuthentication {
+public struct MdocReaderAuthentication: Sendable {
 
     let transcript: SessionTranscript
 	
@@ -34,15 +34,16 @@ public struct MdocReaderAuthentication {
 	///   - readerAuthCertificate: The reader auth certificate decoded from above reader-auth structure. Contains the mdoc reader public key
 	///   - itemsRequestRawData: Reader's item request raw data
 	/// - Returns: (True if verification of reader auth has valid signature, reason for certificate validation failure)
-	public func validateReaderAuth(readerAuthCBOR: CBOR, readerAuthCertificate: Data, itemsRequestRawData: [UInt8], rootCerts: [SecCertificate]? = nil) throws -> (Bool, String?) {
+	public func validateReaderAuth(readerAuthCBOR: CBOR, readerAuthX5c: [Data], itemsRequestRawData: [UInt8], rootCerts: [SecCertificate]? = nil) throws -> (Bool, String?) {
 		let ra = ReaderAuthentication(sessionTranscript: transcript, itemsRequestRawData: itemsRequestRawData)
-        let contentBytes = ra.toCBOR(options: CBOROptions()).taggedEncoded.encode(options: CBOROptions())
-		guard let sc = SecCertificateCreateWithData(nil, Data(readerAuthCertificate) as CFData) else { return (false, "Invalid reader Auth Certificate") }
+		let contentBytes = ra.toCBOR(options: CBOROptions()).taggedEncoded.encode(options: CBOROptions())
+		let secCerts = readerAuthX5c.compactMap { SecCertificateCreateWithData(nil, $0 as CFData) }
+		guard secCerts.count > 0, secCerts.count == readerAuthX5c.count else { return (false, "Invalid reader Auth Certificate") }
 		guard let readerAuth = Cose(type: .sign1, cbor: readerAuthCBOR) else { return (false, "Invalid reader auth CBOR") }
-        guard let publicKeyx963 = SecurityHelpers.getPublicKeyx963(ref: sc) else { return (false, "Public key not found in certificate") }
-        let b1 = try readerAuth.validateDetachedCoseSign1(payloadData: Data(contentBytes), publicKey_x963: publicKeyx963)
-		guard let rootCerts else { return (b1, nil) }
-		let b2 = SecurityHelpers.isMdocCertificateValid(secCert: sc, usage: .mdocReaderAuth, rootCerts: rootCerts)
+		guard let publicKeyx963 = SecurityHelpers.getPublicKeyx963(ref: secCerts.last!) else { return (false, "Public key not found in certificate") }
+		let b1 = try readerAuth.validateDetachedCoseSign1(payloadData: Data(contentBytes), publicKey_x963: publicKeyx963)
+		guard b1 else { return (false, "Reader auth signature validation failed") }
+		let b2 = SecurityHelpers.isMdocX5cValid(secCerts: secCerts, usage: .mdocReaderAuth, rootCerts: rootCerts ?? [])
 		if !b2.isValid { logger.warning(Logger.Message(unicodeScalarLiteral: b2.validationMessages.joined(separator: "\n"))) }
 		return (b1, b2.validationMessages.joined(separator: "\n"))
 	}

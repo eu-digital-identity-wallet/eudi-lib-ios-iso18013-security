@@ -22,7 +22,7 @@ import MdocDataModel18013
 ///
 /// This structure is not transfered, only computed
 /// The mdoc calculates this ephemeral MAC by performing KDF(ECDH(mdoc private key, reader ephemeral public key)) and the mdoc reader calculates this ephemeral MAC by performing KDF(ECDH(mdoc public key, reader ephemeral private key)).
-  public struct ReaderAuthentication {
+  public struct ReaderAuthentication: Sendable {
     let sessionTranscript: SessionTranscript
     let itemsRequestRawData: [UInt8] 
   }
