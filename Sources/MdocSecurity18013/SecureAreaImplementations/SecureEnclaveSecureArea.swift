@@ -42,7 +42,7 @@ public actor SecureEnclaveSecureArea: SecureArea {
     }
     
     /// make shared secret with other public key
-    public func keyAgreement(keyTag: Data, publicKey: Data, curve: CoseEcCurve, keyUnlockData: Data?) throws -> SharedSecret {
+    public func keyAgreement(keyTag: Data, publicKey: Data, with curve: CoseEcCurve, keyUnlockData: Data?) throws -> SharedSecret {
         let puk256 = try P256.KeyAgreement.PublicKey(x963Representation: publicKey)
         let prk256 = try SecureEnclave.P256.KeyAgreement.PrivateKey(dataRepresentation: keyTag)
         let sharedSecret = try prk256.sharedSecretFromKeyAgreement(with: puk256)

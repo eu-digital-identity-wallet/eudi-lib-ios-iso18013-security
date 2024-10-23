@@ -54,7 +54,7 @@ public actor SoftwareSecureArea: SecureArea {
     }
     
     /// make shared secret with other public key
-    public func keyAgreement(keyTag: Data, publicKey: Data, curve: CoseEcCurve, keyUnlockData: Data?) throws -> SharedSecret {
+    public func keyAgreement(keyTag: Data, publicKey: Data, with curve: CoseEcCurve, keyUnlockData: Data?) throws -> SharedSecret {
         let sharedSecret: SharedSecret
         switch curve {
         case .P256:
