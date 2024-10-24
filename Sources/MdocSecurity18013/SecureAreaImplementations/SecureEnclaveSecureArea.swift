@@ -21,38 +21,48 @@ import MdocDataModel18013
 ///
 /// This SecureArea implementation is designed to utilize the Secure Enclave, a specialized hardware component found in iOS devices. The Secure Enclave acts as a hardware-based key manager, providing a secure environment for handling cryptographic keys and operations.
 public actor SecureEnclaveSecureArea: SecureArea {
-    /// make key and return key tag
-    public func createKey(crv: CoseEcCurve, keyInfo: KeyInfo?) throws -> Data {
-        guard crv == Self.defaultEcCurve else { throw SecureAreaError("Unsupported curve \(crv)") }
-        let key = try SecureEnclave.P256.Signing.PrivateKey()
-        // the data representation is opaque and used to recreate the key, therefore we dont need to save the key separetely
-        return key.dataRepresentation
+    var storage: any SecureKeyStorage
+    public init(storage: any SecureKeyStorage) {
+        self.storage = storage
     }
-    
+
+    /// make key and return key tag
+    public func createKey(id: String, keyOptions: KeyOptions) async throws {
+        guard keyOptions.curve == Self.defaultEcCurve else { throw SecureAreaError("Unsupported curve \(keyOptions.curve)") }
+        let key = try SecureEnclave.P256.Signing.PrivateKey()
+        try await storage.writeKeyInfo(id: id, dict: [kSecValueData as String: key.publicKey.x963Representation])
+        try await storage.writeKeyData(id: id, dict: [kSecValueData as String: key.dataRepresentation])
+    }
+
     /// delete key
-    public func deleteKey(keyTag: Data) throws {
+    public func deleteKey(id: String) async throws {
         // nothing to do
     }
     /// compute signature
-    public func signature(keyTag: Data, algorithm: SigningAlgorithm, dataToSign: Data, keyUnlockData: Data?) throws -> Data {
+    public func signature(id: String, algorithm: SigningAlgorithm, dataToSign: Data, keyUnlockData: Data?) async throws -> Data {
         guard algorithm == .ES256 else { throw SecureAreaError("Unsupported algorithm \(algorithm)") }
-        let signingKey = try SecureEnclave.P256.Signing.PrivateKey(dataRepresentation: keyTag)
+        let keyDataDict = try await storage.readKeyData(id: id)
+        guard let dataRepresentation = keyDataDict[kSecValueData as String] else { throw SecureAreaError("Key data not found") }
+        let signingKey = try SecureEnclave.P256.Signing.PrivateKey(dataRepresentation: dataRepresentation)
         let signature = (try signingKey.signature(for: dataToSign)).rawRepresentation
         return signature
     }
-    
+
     /// make shared secret with other public key
-    public func keyAgreement(keyTag: Data, publicKey: Data, with curve: CoseEcCurve, keyUnlockData: Data?) throws -> SharedSecret {
-        let puk256 = try P256.KeyAgreement.PublicKey(x963Representation: publicKey)
-        let prk256 = try SecureEnclave.P256.KeyAgreement.PrivateKey(dataRepresentation: keyTag)
+    public func keyAgreement(id: String, publicKey: CoseKey, keyUnlockData: Data?) async throws -> SharedSecret {
+        let puk256 = try P256.KeyAgreement.PublicKey(x963Representation: publicKey.getx963Representation())
+        let keyDataDict = try await storage.readKeyData(id: id)
+        guard let dataRepresentation = keyDataDict[kSecValueData as String] else { throw SecureAreaError("Key data not found") }
+        let prk256 = try SecureEnclave.P256.KeyAgreement.PrivateKey(dataRepresentation: dataRepresentation)
         let sharedSecret = try prk256.sharedSecretFromKeyAgreement(with: puk256)
         return sharedSecret
     }
-    
+
     /// returns information about the key with the given key
-    public func getKeyInfo(keyTag: Data, keyUnlockData: Data?) throws -> KeyInfo {
-       let prk256 = try SecureEnclave.P256.KeyAgreement.PrivateKey(dataRepresentation: keyTag)
-        let keyInfo = KeyInfo(publicKey: prk256.publicKey.x963Representation, curve: .P256)
+    public func getKeyInfo(id: String) async throws -> KeyInfo {
+        let keyInfoDict = try await storage.readKeyInfo(id: id)
+        guard let x963Representation = keyInfoDict[kSecValueData as String] else { throw SecureAreaError("Key info not found") }
+        let keyInfo = KeyInfo(publicKey: CoseKey(crv: .P256, x963Representation: x963Representation))
         return keyInfo
     }
 }
