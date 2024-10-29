@@ -23,7 +23,7 @@ import MdocDataModel18013
 /// This SecureArea implementation uses iOS Cryptokit framework
 public class SampleDataSecureArea: SecureArea, @unchecked Sendable {
     public var storage: any SecureKeyStorage
-    public var x963Key: Data!
+    public var x963Key: Data?
     
     required public init(storage: any SecureKeyStorage) {
         self.storage = storage
@@ -33,9 +33,15 @@ public class SampleDataSecureArea: SecureArea, @unchecked Sendable {
         let x963Priv: Data; let x963Pub: Data; let secKey: SecKey
         let curve = keyOptions?.curve ?? .P256
         switch curve {
-        case .P256: let key = try P256.Signing.PrivateKey(x963Representation: x963Key); x963Priv = key.x963Representation; x963Pub = key.publicKey.x963Representation; secKey = try key.toSecKey()
-        case .P384: let key = try P384.Signing.PrivateKey(x963Representation: x963Key); x963Priv = key.x963Representation; x963Pub = key.publicKey.x963Representation; secKey = try key.toSecKey()
-        case .P521: let key = try P521.Signing.PrivateKey(x963Representation: x963Key); x963Priv = key.x963Representation; x963Pub = key.publicKey.x963Representation; secKey = try key.toSecKey()
+        case .P256:
+            let key = if let x963Key { try P256.Signing.PrivateKey(x963Representation: x963Key) } else { P256.Signing.PrivateKey() }
+            x963Priv = key.x963Representation; x963Pub = key.publicKey.x963Representation; secKey = try key.toSecKey()
+        case .P384:
+            let key = if let x963Key { try P384.Signing.PrivateKey(x963Representation: x963Key) } else { P384.Signing.PrivateKey() }
+            x963Priv = key.x963Representation; x963Pub = key.publicKey.x963Representation; secKey = try key.toSecKey()
+            case .P521:
+                let key = if let x963Key { try P521.Signing.PrivateKey(x963Representation: x963Key) } else { P521.Signing.PrivateKey() }
+                x963Priv = key.x963Representation; x963Pub = key.publicKey.x963Representation; secKey = try key.toSecKey()
         default: throw SecureAreaError("Unsupported curve \(curve)")
         }
         try storage.writeKeyInfo(id: id, dict: [kSecValueData as String: x963Pub, kSecAttrDescription as String: curve.jwkName.data(using: .utf8)!])
