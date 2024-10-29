@@ -61,9 +61,17 @@ public class SecureEnclaveSecureArea: SecureArea, @unchecked Sendable {
 
     /// returns information about the key with the given key
     public func getKeyInfo(id: String) throws -> KeyInfo {
-        let keyInfoDict = try storage.readKeyInfo(id: id)
-        guard let x963Representation = keyInfoDict[kSecValueData as String] else { throw SecureAreaError("Key info not found") }
-        let keyInfo = KeyInfo(publicKey: CoseKey(crv: .P256, x963Representation: x963Representation))
-        return keyInfo
+        do {
+            let keyInfoDict = try storage.readKeyInfo(id: id)
+            guard let x963Representation = keyInfoDict[kSecValueData as String] else { throw SecureAreaError("Key info not found") }
+            let keyInfo = KeyInfo(publicKey: CoseKey(crv: .P256, x963Representation: x963Representation))
+            return keyInfo
+        } catch {
+            let keyDataDict = try storage.readKeyData(id: id)
+            guard let dataRepresentation = keyDataDict[kSecValueData as String] else { throw SecureAreaError("Key data not found") }
+            let prk256 = try SecureEnclave.P256.KeyAgreement.PrivateKey(dataRepresentation: dataRepresentation)
+            let keyInfo = KeyInfo(publicKey: CoseKey(crv: .P256, x963Representation: prk256.publicKey.x963Representation))
+            return keyInfo
+        }
     }
 }
