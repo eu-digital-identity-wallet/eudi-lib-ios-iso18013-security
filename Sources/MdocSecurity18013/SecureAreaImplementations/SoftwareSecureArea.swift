@@ -94,14 +94,11 @@ public class SoftwareSecureArea: SecureArea, @unchecked Sendable {
         guard let x963Pub = keyInfoDict[kSecValueData as String] else { throw SecureAreaError("Key info data not found") }
         switch curve {
         case .P256:
-            let signingKey = try P256.Signing.PrivateKey(x963Representation: x963Pub)
-            publicKey = CoseKey(crv: .P256, x963Representation: signingKey.publicKey.x963Representation)
+            publicKey = CoseKey(crv: .P256, x963Representation: x963Pub)
         case .P384:
-            let signingKey = try P384.Signing.PrivateKey(x963Representation: x963Pub)
-            publicKey = CoseKey(crv: .P384, x963Representation: signingKey.publicKey.x963Representation)
+            publicKey = CoseKey(crv: .P384, x963Representation: x963Pub)
         case .P521:
-            let signingKey = try P521.Signing.PrivateKey(x963Representation: x963Pub)
-            publicKey = CoseKey(crv: .P521, x963Representation: signingKey.publicKey.x963Representation)
+            publicKey = CoseKey(crv: .P521, x963Representation: x963Pub)
         default: throw SecureAreaError("Unsupported curve \(curve )")
         }
         let keyInfo = KeyInfo(publicKey: publicKey)
