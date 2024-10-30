@@ -29,7 +29,7 @@ public class SecureEnclaveSecureArea: SecureArea, @unchecked Sendable {
     /// make key and return key tag
     public func createKey(id: String, keyOptions: KeyOptions?) throws -> (SecKey, CoseKey) {
         if let keyOptions, keyOptions.curve != Self.defaultEcCurve { throw SecureAreaError("Unsupported curve \(keyOptions.curve)") }
-        let key = try SecureEnclave.P256.Signing.PrivateKey()
+        let key = try SecureEnclave.P256.KeyAgreement.PrivateKey()
         try storage.writeKeyInfo(id: id, dict: [kSecValueData as String: key.publicKey.x963Representation])
         try storage.writeKeyData(id: id, dict: [kSecValueData as String: key.dataRepresentation], keyOptions: keyOptions)
         return (try key.toSecKey(), CoseKey(crv: .P256, x963Representation: key.publicKey.x963Representation))

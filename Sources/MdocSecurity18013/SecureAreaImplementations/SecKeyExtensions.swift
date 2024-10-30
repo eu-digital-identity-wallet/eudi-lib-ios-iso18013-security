@@ -31,6 +31,19 @@ extension SecureEnclave.P256.Signing.PrivateKey {
 	}
 }
 
+extension SecureEnclave.P256.KeyAgreement.PrivateKey {
+    func toSecKey() throws -> SecKey {
+        var errorQ: Unmanaged<CFError>?
+        guard let sf = SecKeyCreateWithData(Data() as NSData, [
+            kSecAttrKeyType: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecAttrKeyClass: kSecAttrKeyClassPrivate,
+            kSecAttrTokenID: kSecAttrTokenIDSecureEnclave,
+            "toid": dataRepresentation
+        ] as NSDictionary, &errorQ) else { throw errorQ!.takeRetainedValue() as Error }
+        return sf
+    }
+}
+
 extension P256.Signing.PrivateKey {
 	func toSecKey() throws -> SecKey {
 		var error: Unmanaged<CFError>?
