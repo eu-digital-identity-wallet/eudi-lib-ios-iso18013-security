@@ -23,7 +23,7 @@ extension CoseKeyExchange {
 
 	/// Computes a shared secret from the private key and the provided public key from another party.
 	public func makeEckaDHAgreement() -> SharedSecret? {
-        let sharedSecret: SharedSecret? = try? privateKey.secureArea.keyAgreement(id: privateKey.privateKeyId, publicKey: publicKey, keyUnlockData: nil)
+        let sharedSecret: SharedSecret? = try? privateKey.secureArea.keyAgreement(id: privateKey.privateKeyId, publicKey: publicKey)
 		return sharedSecret
 	}	
 }

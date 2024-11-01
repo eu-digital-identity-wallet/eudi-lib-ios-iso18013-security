@@ -46,7 +46,7 @@ public class SoftwareSecureArea: SecureArea, @unchecked Sendable {
         try storage.deleteKey(id: id)
     }
     /// compute signature
-    public func signature(id: String, algorithm: SigningAlgorithm, dataToSign: Data, keyUnlockData: Data?) throws -> Data {
+    public func signature(id: String, algorithm: SigningAlgorithm, dataToSign: Data) throws -> Data {
         let signature: Data
         let x963Priv = try getKeyData(id: id)
         switch algorithm {
@@ -65,7 +65,7 @@ public class SoftwareSecureArea: SecureArea, @unchecked Sendable {
     }
     
     /// make shared secret with other public key
-    public func keyAgreement(id: String, publicKey: CoseKey, keyUnlockData: Data?) throws -> SharedSecret {
+    public func keyAgreement(id: String, publicKey: CoseKey) throws -> SharedSecret {
         let sharedSecret: SharedSecret
         let (_, curve) = try getInfoAndCurve(id: id)
         let x963Priv = try getKeyData(id: id)

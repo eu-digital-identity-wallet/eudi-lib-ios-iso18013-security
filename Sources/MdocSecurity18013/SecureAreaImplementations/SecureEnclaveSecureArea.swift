@@ -40,7 +40,7 @@ public class SecureEnclaveSecureArea: SecureArea, @unchecked Sendable {
         try storage.deleteKey(id: id)
     }
     /// compute signature
-    public func signature(id: String, algorithm: SigningAlgorithm, dataToSign: Data, keyUnlockData: Data?) throws -> Data {
+    public func signature(id: String, algorithm: SigningAlgorithm, dataToSign: Data) throws -> Data {
         guard algorithm == .ES256 else { throw SecureAreaError("Unsupported algorithm \(algorithm)") }
         let keyDataDict = try storage.readKeyData(id: id)
         guard let dataRepresentation = keyDataDict[kSecValueData as String] else { throw SecureAreaError("Key data not found") }
@@ -50,7 +50,7 @@ public class SecureEnclaveSecureArea: SecureArea, @unchecked Sendable {
     }
 
     /// make shared secret with other public key
-    public func keyAgreement(id: String, publicKey: CoseKey, keyUnlockData: Data?) throws -> SharedSecret {
+    public func keyAgreement(id: String, publicKey: CoseKey) throws -> SharedSecret {
         let puk256 = try P256.KeyAgreement.PublicKey(x963Representation: publicKey.getx963Representation())
         let keyDataDict = try storage.readKeyData(id: id)
         guard let dataRepresentation = keyDataDict[kSecValueData as String] else { throw SecureAreaError("Key data not found") }

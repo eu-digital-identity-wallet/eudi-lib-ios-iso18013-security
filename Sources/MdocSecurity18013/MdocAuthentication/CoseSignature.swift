@@ -28,7 +28,7 @@ extension Cose {
 	public static func makeDetachedCoseSign1(payloadData: Data, deviceKey: CoseKeyPrivate, alg: Cose.VerifyAlgorithm) throws -> Cose {
 		let coseIn = Cose(type: .sign1, algorithm: alg.rawValue, payloadData: payloadData)
 		let dataToSign = coseIn.signatureStruct!
-        let signature: Data = try deviceKey.secureArea.signature(id: deviceKey.privateKeyId, algorithm: alg.signingAlgorithm, dataToSign: dataToSign, keyUnlockData: nil)
+        let signature: Data = try deviceKey.secureArea.signature(id: deviceKey.privateKeyId, algorithm: alg.signingAlgorithm, dataToSign: dataToSign)
 		// return COSE_SIGN1 struct
 		return Cose(type: .sign1, algorithm: alg.rawValue, signature: signature)
 	}

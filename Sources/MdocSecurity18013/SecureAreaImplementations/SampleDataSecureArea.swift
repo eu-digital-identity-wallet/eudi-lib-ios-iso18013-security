@@ -54,15 +54,15 @@ public class SampleDataSecureArea: SecureArea, @unchecked Sendable {
         try storage.deleteKey(id: id)
     }
     /// compute signature
-    public func signature(id: String, algorithm: SigningAlgorithm, dataToSign: Data, keyUnlockData: Data?) throws -> Data {
+    public func signature(id: String, algorithm: SigningAlgorithm, dataToSign: Data) throws -> Data {
         let softwareSA = SoftwareSecureArea(storage: storage)
-        return try softwareSA.signature(id: id, algorithm: algorithm, dataToSign: dataToSign, keyUnlockData: keyUnlockData)
+        return try softwareSA.signature(id: id, algorithm: algorithm, dataToSign: dataToSign)
     }
     
     /// make shared secret with other public key
-    public func keyAgreement(id: String, publicKey: CoseKey, keyUnlockData: Data?) throws -> SharedSecret {
+    public func keyAgreement(id: String, publicKey: CoseKey) throws -> SharedSecret {
         let softwareSA = SoftwareSecureArea(storage: storage)
-        return try softwareSA.keyAgreement(id: id, publicKey: publicKey, keyUnlockData: keyUnlockData)
+        return try softwareSA.keyAgreement(id: id, publicKey: publicKey)
     }
     
     /// returns information about the key with the given key
