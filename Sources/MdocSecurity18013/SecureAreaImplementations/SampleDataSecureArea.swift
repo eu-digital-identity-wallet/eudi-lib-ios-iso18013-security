@@ -29,24 +29,24 @@ public class SampleDataSecureArea: SecureArea, @unchecked Sendable {
         self.storage = storage
     }
     /// make key and return key tag
-    public func createKey(id: String, keyOptions: KeyOptions?) throws -> (SecKey, CoseKey) {
-        let x963Priv: Data; let x963Pub: Data; let secKey: SecKey
+    public func createKey(id: String, keyOptions: KeyOptions?) throws -> CoseKey {
+        let x963Priv: Data; let x963Pub: Data
         let curve = keyOptions?.curve ?? .P256
         switch curve {
         case .P256:
             let key = if let x963Key { try P256.Signing.PrivateKey(x963Representation: x963Key) } else { P256.Signing.PrivateKey() }
-            x963Priv = key.x963Representation; x963Pub = key.publicKey.x963Representation; secKey = try key.toSecKey()
+            x963Priv = key.x963Representation; x963Pub = key.publicKey.x963Representation
         case .P384:
             let key = if let x963Key { try P384.Signing.PrivateKey(x963Representation: x963Key) } else { P384.Signing.PrivateKey() }
-            x963Priv = key.x963Representation; x963Pub = key.publicKey.x963Representation; secKey = try key.toSecKey()
-            case .P521:
-                let key = if let x963Key { try P521.Signing.PrivateKey(x963Representation: x963Key) } else { P521.Signing.PrivateKey() }
-                x963Priv = key.x963Representation; x963Pub = key.publicKey.x963Representation; secKey = try key.toSecKey()
+            x963Priv = key.x963Representation; x963Pub = key.publicKey.x963Representation
+        case .P521:
+            let key = if let x963Key { try P521.Signing.PrivateKey(x963Representation: x963Key) } else { P521.Signing.PrivateKey() }
+            x963Priv = key.x963Representation; x963Pub = key.publicKey.x963Representation
         default: throw SecureAreaError("Unsupported curve \(curve)")
         }
         try storage.writeKeyInfo(id: id, dict: [kSecValueData as String: x963Pub, kSecAttrDescription as String: curve.jwkName.data(using: .utf8)!])
         try storage.writeKeyData(id: id, dict: [kSecValueData as String: x963Priv], keyOptions: keyOptions)
-        return (secKey, CoseKey(crv: curve, x963Representation: x963Pub))
+        return CoseKey(crv: curve, x963Representation: x963Pub)
     }
     
     /// delete key
@@ -54,15 +54,15 @@ public class SampleDataSecureArea: SecureArea, @unchecked Sendable {
         try storage.deleteKey(id: id)
     }
     /// compute signature
-    public func signature(id: String, algorithm: SigningAlgorithm, dataToSign: Data) throws -> Data {
+    public func signature(id: String, algorithm: SigningAlgorithm, dataToSign: Data, unlockData: Data?) throws -> (raw: Data, der: Data) {
         let softwareSA = SoftwareSecureArea(storage: storage)
-        return try softwareSA.signature(id: id, algorithm: algorithm, dataToSign: dataToSign)
+        return try softwareSA.signature(id: id, algorithm: algorithm, dataToSign: dataToSign, unlockData: unlockData)
     }
     
     /// make shared secret with other public key
-    public func keyAgreement(id: String, publicKey: CoseKey) throws -> SharedSecret {
+    public func keyAgreement(id: String, publicKey: CoseKey, unlockData: Data?) throws -> SharedSecret {
         let softwareSA = SoftwareSecureArea(storage: storage)
-        return try softwareSA.keyAgreement(id: id, publicKey: publicKey)
+        return try softwareSA.keyAgreement(id: id, publicKey: publicKey, unlockData: unlockData)
     }
     
     /// returns information about the key with the given key

@@ -27,18 +27,18 @@ public class SoftwareSecureArea: SecureArea, @unchecked Sendable {
         self.storage = storage
     }
     /// make key and return key tag
-    public func createKey(id: String, keyOptions: KeyOptions?) throws -> (SecKey, CoseKey) {
-        let x963Priv: Data; let x963Pub: Data; let secKey: SecKey
+    public func createKey(id: String, keyOptions: KeyOptions?) throws -> CoseKey {
+        let x963Priv: Data; let x963Pub: Data
         let curve = keyOptions?.curve ?? .P256
         switch curve {
-        case .P256: let key = P256.Signing.PrivateKey(compactRepresentable: false); x963Priv = key.x963Representation; x963Pub = key.publicKey.x963Representation; secKey = try key.toSecKey()
-        case .P384: let key = P384.Signing.PrivateKey(compactRepresentable: false); x963Priv = key.x963Representation; x963Pub = key.publicKey.x963Representation; secKey = try key.toSecKey()
-        case .P521: let key = P521.Signing.PrivateKey(compactRepresentable: false); x963Priv = key.x963Representation; x963Pub = key.publicKey.x963Representation; secKey = try key.toSecKey()
+        case .P256: let key = P256.Signing.PrivateKey(compactRepresentable: false); x963Priv = key.x963Representation; x963Pub = key.publicKey.x963Representation
+        case .P384: let key = P384.Signing.PrivateKey(compactRepresentable: false); x963Priv = key.x963Representation; x963Pub = key.publicKey.x963Representation
+        case .P521: let key = P521.Signing.PrivateKey(compactRepresentable: false); x963Priv = key.x963Representation; x963Pub = key.publicKey.x963Representation
         default: throw SecureAreaError("Unsupported curve \(curve)")
         }
         try storage.writeKeyInfo(id: id, dict: [kSecValueData as String: x963Pub, kSecAttrDescription as String: curve.jwkName.data(using: .utf8)!])
         try storage.writeKeyData(id: id, dict: [kSecValueData as String: x963Priv], keyOptions: keyOptions)
-        return (secKey, CoseKey(crv: curve, x963Representation: x963Pub))
+        return CoseKey(crv: curve, x963Representation: x963Pub)
     }
     
     /// delete key
@@ -46,26 +46,27 @@ public class SoftwareSecureArea: SecureArea, @unchecked Sendable {
         try storage.deleteKey(id: id)
     }
     /// compute signature
-    public func signature(id: String, algorithm: SigningAlgorithm, dataToSign: Data) throws -> Data {
-        let signature: Data
+    public func signature(id: String, algorithm: SigningAlgorithm, dataToSign: Data, unlockData: Data?) throws -> (raw: Data, der: Data) {
         let x963Priv = try getKeyData(id: id)
         switch algorithm {
         case .ES256:
             let signingKey = try P256.Signing.PrivateKey(x963Representation: x963Priv)
-            signature = (try signingKey.signature(for: dataToSign)).rawRepresentation
+            let signature = try signingKey.signature(for: dataToSign)
+            return (signature.rawRepresentation, signature.derRepresentation)
         case .ES384:
             let signingKey = try P384.Signing.PrivateKey(x963Representation: x963Priv)
-            signature = (try signingKey.signature(for: dataToSign)).rawRepresentation
+            let signature = try signingKey.signature(for: dataToSign)
+            return (signature.rawRepresentation, signature.derRepresentation)
         case .ES512:
             let signingKey = try P521.Signing.PrivateKey(x963Representation: x963Priv)
-            signature = (try signingKey.signature(for: dataToSign)).rawRepresentation
+            let signature = try signingKey.signature(for: dataToSign)
+            return (signature.rawRepresentation, signature.derRepresentation)
         default: throw SecureAreaError("Unsupported algorithm \(algorithm)")
         }
-        return signature
     }
     
     /// make shared secret with other public key
-    public func keyAgreement(id: String, publicKey: CoseKey) throws -> SharedSecret {
+    public func keyAgreement(id: String, publicKey: CoseKey, unlockData: Data?) throws -> SharedSecret {
         let sharedSecret: SharedSecret
         let (_, curve) = try getInfoAndCurve(id: id)
         let x963Priv = try getKeyData(id: id)

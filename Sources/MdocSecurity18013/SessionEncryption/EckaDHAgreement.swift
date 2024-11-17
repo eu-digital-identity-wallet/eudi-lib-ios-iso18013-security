@@ -22,8 +22,8 @@ import MdocDataModel18013
 extension CoseKeyExchange {
 
 	/// Computes a shared secret from the private key and the provided public key from another party.
-	public func makeEckaDHAgreement() -> SharedSecret? {
-        let sharedSecret: SharedSecret? = try? privateKey.secureArea.keyAgreement(id: privateKey.privateKeyId, publicKey: publicKey)
+    public func makeEckaDHAgreement(unlockData: Data? = nil) -> SharedSecret? {
+        let sharedSecret: SharedSecret? = try? privateKey.secureArea.keyAgreement(id: privateKey.privateKeyId, publicKey: publicKey, unlockData: unlockData)
 		return sharedSecret
 	}	
 }

@@ -27,12 +27,12 @@ public class SecureEnclaveSecureArea: SecureArea, @unchecked Sendable {
     }
 
     /// make key and return key tag
-    public func createKey(id: String, keyOptions: KeyOptions?) throws -> (SecKey, CoseKey) {
+    public func createKey(id: String, keyOptions: KeyOptions?) throws -> CoseKey {
         if let keyOptions, keyOptions.curve != Self.defaultEcCurve { throw SecureAreaError("Unsupported curve \(keyOptions.curve)") }
         let key = try SecureEnclave.P256.KeyAgreement.PrivateKey()
         try storage.writeKeyInfo(id: id, dict: [kSecValueData as String: key.publicKey.x963Representation])
         try storage.writeKeyData(id: id, dict: [kSecValueData as String: key.dataRepresentation], keyOptions: keyOptions)
-        return (try key.toSecKey(), CoseKey(crv: .P256, x963Representation: key.publicKey.x963Representation))
+        return CoseKey(crv: .P256, x963Representation: key.publicKey.x963Representation)
     }
 
     /// delete key
@@ -40,17 +40,17 @@ public class SecureEnclaveSecureArea: SecureArea, @unchecked Sendable {
         try storage.deleteKey(id: id)
     }
     /// compute signature
-    public func signature(id: String, algorithm: SigningAlgorithm, dataToSign: Data) throws -> Data {
+    public func signature(id: String, algorithm: SigningAlgorithm, dataToSign: Data, unlockData: Data?) throws -> (raw: Data, der: Data) {
         guard algorithm == .ES256 else { throw SecureAreaError("Unsupported algorithm \(algorithm)") }
         let keyDataDict = try storage.readKeyData(id: id)
         guard let dataRepresentation = keyDataDict[kSecValueData as String] else { throw SecureAreaError("Key data not found") }
         let signingKey = try SecureEnclave.P256.Signing.PrivateKey(dataRepresentation: dataRepresentation)
-        let signature = (try signingKey.signature(for: dataToSign)).rawRepresentation
-        return signature
+        let signature = try signingKey.signature(for: dataToSign)
+        return (signature.rawRepresentation, signature.derRepresentation)
     }
 
     /// make shared secret with other public key
-    public func keyAgreement(id: String, publicKey: CoseKey) throws -> SharedSecret {
+    public func keyAgreement(id: String, publicKey: CoseKey, unlockData: Data?) throws -> SharedSecret {
         let puk256 = try P256.KeyAgreement.PublicKey(x963Representation: publicKey.getx963Representation())
         let keyDataDict = try storage.readKeyData(id: id)
         guard let dataRepresentation = keyDataDict[kSecValueData as String] else { throw SecureAreaError("Key data not found") }

@@ -25,12 +25,12 @@ extension Cose {
 	///   - deviceKey: static device private key (encoded with ANSI x.963 or stored in SE)
 	///   - alg: The algorithm to sign with
 	/// - Returns: a detached COSE-Sign1 structure
-	public static func makeDetachedCoseSign1(payloadData: Data, deviceKey: CoseKeyPrivate, alg: Cose.VerifyAlgorithm) throws -> Cose {
+    public static func makeDetachedCoseSign1(payloadData: Data, deviceKey: CoseKeyPrivate, alg: Cose.VerifyAlgorithm, unlockData: Data?) throws -> Cose {
 		let coseIn = Cose(type: .sign1, algorithm: alg.rawValue, payloadData: payloadData)
 		let dataToSign = coseIn.signatureStruct!
-        let signature: Data = try deviceKey.secureArea.signature(id: deviceKey.privateKeyId, algorithm: alg.signingAlgorithm, dataToSign: dataToSign)
+        let signature = try deviceKey.secureArea.signature(id: deviceKey.privateKeyId, algorithm: alg.signingAlgorithm, dataToSign: dataToSign, unlockData: unlockData)
 		// return COSE_SIGN1 struct
-		return Cose(type: .sign1, algorithm: alg.rawValue, signature: signature)
+        return Cose(type: .sign1, algorithm: alg.rawValue, signature: signature.raw)
 	}
 	
 	/// Validate (verify) a detached COSE-Sign1 structure according to https://datatracker.ietf.org/doc/html/rfc8152#section-4.4

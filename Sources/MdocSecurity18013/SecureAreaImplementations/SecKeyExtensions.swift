@@ -54,6 +54,16 @@ extension P256.Signing.PrivateKey {
 	}
 }
 
+extension P256.KeyAgreement.PrivateKey {
+    public func toSecKey() throws -> SecKey {
+        var error: Unmanaged<CFError>?
+        guard let privateKey = SecKeyCreateWithData(x963Representation as NSData, [kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom, kSecAttrKeyClass: kSecAttrKeyClassPrivate] as NSDictionary, &error) else {
+            throw error!.takeRetainedValue() as Error
+        }
+        return privateKey
+    }
+}
+
 extension P384.Signing.PrivateKey {
     func toSecKey() throws -> SecKey {
         var error: Unmanaged<CFError>?
