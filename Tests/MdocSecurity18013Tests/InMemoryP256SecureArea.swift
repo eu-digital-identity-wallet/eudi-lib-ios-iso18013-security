@@ -28,7 +28,7 @@ public final class InMemoryP256SecureArea: SecureArea, @unchecked Sendable {
         self.storage = storage
     }
 
-    public func createKey(id: String, keyOptions: MdocDataModel18013.KeyOptions?) throws -> MdocDataModel18013.CoseKey {
+    public func createKey(id: String, keyOptions: MdocDataModel18013.KeyOptions?) async throws -> MdocDataModel18013.CoseKey {
         key = if let x963Key { try P256.Signing.PrivateKey(x963Representation: x963Key) } else { P256.Signing.PrivateKey() }
         guard let privateKey = SecKeyCreateWithData(key.x963Representation as NSData, [kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom, kSecAttrKeyClass: kSecAttrKeyClassPrivate] as NSDictionary, nil) else {  throw NSError(domain: "", code: 0, userInfo: [NSLocalizedDescriptionKey : "Error creating private key"])  }
         return CoseKey(crv: .P256, x963Representation: key.publicKey.x963Representation)
@@ -37,12 +37,12 @@ public final class InMemoryP256SecureArea: SecureArea, @unchecked Sendable {
     public func deleteKey(id: String) throws {
     }
 
-    public func signature(id: String, algorithm: MdocDataModel18013.SigningAlgorithm, dataToSign: Data, unlockData: Data? = nil) throws -> (raw: Data, der: Data) {
+    public func signature(id: String, algorithm: MdocDataModel18013.SigningAlgorithm, dataToSign: Data, unlockData: Data? = nil) async throws -> (raw: Data, der: Data) {
         let signature = try key.signature(for: dataToSign)
         return (signature.rawRepresentation, signature.derRepresentation)
     }
 
-    public func keyAgreement(id: String, publicKey: MdocDataModel18013.CoseKey, unlockData: Data?) throws -> SharedSecret {
+    public func keyAgreement(id: String, publicKey: MdocDataModel18013.CoseKey, unlockData: Data?) async throws -> SharedSecret {
         let puk256 = try P256.KeyAgreement.PublicKey(x963Representation: publicKey.getx963Representation())
         let prk256 = try P256.KeyAgreement.PrivateKey(x963Representation: key.x963Representation)
         let sharedSecret = try prk256.sharedSecretFromKeyAgreement(with: puk256)
@@ -50,29 +50,29 @@ public final class InMemoryP256SecureArea: SecureArea, @unchecked Sendable {
 
     }
 
-    public func getKeyInfo(id: String) throws -> MdocDataModel18013.KeyInfo {
+    public func getKeyInfo(id: String) async throws -> MdocDataModel18013.KeyInfo {
         KeyInfo(publicKey: CoseKey(crv: .P256, x963Representation: key.publicKey.x963Representation))
     }
 }
 
 public final class DummySecureKeyStorage: MdocDataModel18013.SecureKeyStorage {
-    public func readKeyInfo(id: String) throws -> [String : Data] {
+    public func readKeyInfo(id: String) async throws -> [String : Data] {
         [:]
     }
 
-    public func readKeyData(id: String) throws -> [String : Data] {
+    public func readKeyData(id: String) async throws -> [String : Data] {
         [:]
     }
 
-    public func writeKeyInfo(id: String, dict: [String : Data]) throws {
+    public func writeKeyInfo(id: String, dict: [String : Data]) async throws {
         
     }
 
-    public func writeKeyData(id: String, dict: [String : Data], keyOptions: MdocDataModel18013.KeyOptions?) throws {
+    public func writeKeyData(id: String, dict: [String : Data], keyOptions: MdocDataModel18013.KeyOptions?) async throws {
         
     }
 
-    public func deleteKey(id: String) throws {
+    public func deleteKey(id: String) async throws {
         
     }
     
@@ -86,7 +86,7 @@ extension MdocDataModel18013.CoseKeyPrivate {
         let keyData = NSMutableData(bytes: [0x04], length: [0x04].count)
         keyData.append(Data(coseKey.x)); keyData.append(Data(coseKey.y)); keyData.append(Data(rd))
         sampleSA.x963Key = keyData as Data
-        try? self.init(curve: coseKey.crv, secureArea: sampleSA)
+        try? self.init(secureArea: sampleSA)
     }
     
     /// Create a COSE_Key from Elliptic Curve paramters of the private key.
@@ -100,6 +100,6 @@ extension MdocDataModel18013.CoseKeyPrivate {
         let keyData = NSMutableData(bytes: [0x04], length: [0x04].count)
         keyData.append(Data(x)); keyData.append(Data(y)); keyData.append(Data(d))
         sampleSA.x963Key = keyData as Data
-        try! self.init(curve: crv, secureArea: sampleSA)
+        try! self.init(secureArea: sampleSA)
     }
 }

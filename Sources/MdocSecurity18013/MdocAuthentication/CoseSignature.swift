@@ -25,10 +25,10 @@ extension Cose {
 	///   - deviceKey: static device private key (encoded with ANSI x.963 or stored in SE)
 	///   - alg: The algorithm to sign with
 	/// - Returns: a detached COSE-Sign1 structure
-    public static func makeDetachedCoseSign1(payloadData: Data, deviceKey: CoseKeyPrivate, alg: Cose.VerifyAlgorithm, unlockData: Data?) throws -> Cose {
+    public static func makeDetachedCoseSign1(payloadData: Data, deviceKey: CoseKeyPrivate, alg: Cose.VerifyAlgorithm, unlockData: Data?) async throws -> Cose {
 		let coseIn = Cose(type: .sign1, algorithm: alg.rawValue, payloadData: payloadData)
 		let dataToSign = coseIn.signatureStruct!
-        let signature = try deviceKey.secureArea.signature(id: deviceKey.privateKeyId, algorithm: alg.signingAlgorithm, dataToSign: dataToSign, unlockData: unlockData)
+        let signature = try await deviceKey.secureArea.signature(id: deviceKey.privateKeyId, algorithm: alg.signingAlgorithm, dataToSign: dataToSign, unlockData: unlockData)
 		// return COSE_SIGN1 struct
         return Cose(type: .sign1, algorithm: alg.rawValue, signature: signature.raw)
 	}

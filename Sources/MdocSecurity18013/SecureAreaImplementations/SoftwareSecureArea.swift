@@ -27,7 +27,7 @@ public class SoftwareSecureArea: SecureArea, @unchecked Sendable {
         self.storage = storage
     }
     /// make key and return key tag
-    public func createKey(id: String, keyOptions: KeyOptions?) throws -> CoseKey {
+    public func createKey(id: String, keyOptions: KeyOptions?) async throws -> CoseKey {
         let x963Priv: Data; let x963Pub: Data
         let curve = keyOptions?.curve ?? .P256
         switch curve {
@@ -36,18 +36,18 @@ public class SoftwareSecureArea: SecureArea, @unchecked Sendable {
         case .P521: let key = P521.Signing.PrivateKey(compactRepresentable: false); x963Priv = key.x963Representation; x963Pub = key.publicKey.x963Representation
         default: throw SecureAreaError("Unsupported curve \(curve)")
         }
-        try storage.writeKeyInfo(id: id, dict: [kSecValueData as String: x963Pub, kSecAttrDescription as String: curve.jwkName.data(using: .utf8)!])
-        try storage.writeKeyData(id: id, dict: [kSecValueData as String: x963Priv], keyOptions: keyOptions)
+        try await storage.writeKeyInfo(id: id, dict: [kSecValueData as String: x963Pub, kSecAttrDescription as String: curve.jwkName.data(using: .utf8)!])
+        try await storage.writeKeyData(id: id, dict: [kSecValueData as String: x963Priv], keyOptions: keyOptions)
         return CoseKey(crv: curve, x963Representation: x963Pub)
     }
     
     /// delete key
-    public func deleteKey(id: String) throws {
-        try storage.deleteKey(id: id)
+    public func deleteKey(id: String) async throws {
+        try await storage.deleteKey(id: id)
     }
     /// compute signature
-    public func signature(id: String, algorithm: SigningAlgorithm, dataToSign: Data, unlockData: Data?) throws -> (raw: Data, der: Data) {
-        let x963Priv = try getKeyData(id: id)
+    public func signature(id: String, algorithm: SigningAlgorithm, dataToSign: Data, unlockData: Data?) async throws -> (raw: Data, der: Data) {
+        let x963Priv = try await getKeyData(id: id)
         switch algorithm {
         case .ES256:
             let signingKey = try P256.Signing.PrivateKey(x963Representation: x963Priv)
@@ -66,10 +66,10 @@ public class SoftwareSecureArea: SecureArea, @unchecked Sendable {
     }
     
     /// make shared secret with other public key
-    public func keyAgreement(id: String, publicKey: CoseKey, unlockData: Data?) throws -> SharedSecret {
+    public func keyAgreement(id: String, publicKey: CoseKey, unlockData: Data?) async throws -> SharedSecret {
         let sharedSecret: SharedSecret
-        let (_, curve) = try getInfoAndCurve(id: id)
-        let x963Priv = try getKeyData(id: id)
+        let (_, curve) = try await getInfoAndCurve(id: id)
+        let x963Priv = try await getKeyData(id: id)
         switch curve {
         case .P256:
             let puk256 = try P256.KeyAgreement.PublicKey(x963Representation: publicKey.getx963Representation())
@@ -89,9 +89,9 @@ public class SoftwareSecureArea: SecureArea, @unchecked Sendable {
     }
     
     /// returns information about the key with the given key
-    public func getKeyInfo(id: String) throws -> KeyInfo {
+    public func getKeyInfo(id: String) async throws -> KeyInfo {
         let publicKey: CoseKey
-        let (keyInfoDict, curve) = try getInfoAndCurve(id: id)
+        let (keyInfoDict, curve) = try await getInfoAndCurve(id: id)
         guard let x963Pub = keyInfoDict[kSecValueData as String] else { throw SecureAreaError("Key info data not found") }
         switch curve {
         case .P256:
@@ -106,15 +106,15 @@ public class SoftwareSecureArea: SecureArea, @unchecked Sendable {
         return keyInfo
     }
     
-    func getInfoAndCurve(id: String) throws -> ([String:Data], CoseEcCurve) {
-        let keyInfoDict = try storage.readKeyInfo(id: id)
+    func getInfoAndCurve(id: String) async throws -> ([String:Data], CoseEcCurve) {
+        let keyInfoDict = try await storage.readKeyInfo(id: id)
         guard let jwkNameData = keyInfoDict[kSecAttrDescription as String], let jwkName = String(data: jwkNameData, encoding: .utf8) else { throw SecureAreaError("Key info description not found") }
         let curve = try CoseEcCurve.fromJwkName(jwkName)
         return (keyInfoDict, curve)
     }
     
-    func getKeyData(id: String) throws -> Data {
-        let keyDataDict = try storage.readKeyData(id: id)
+    func getKeyData(id: String) async throws -> Data {
+        let keyDataDict = try await storage.readKeyData(id: id)
         guard let x963Representation = keyDataDict[kSecValueData as String] else { throw SecureAreaError("Key data not found") }
         return x963Representation
     }

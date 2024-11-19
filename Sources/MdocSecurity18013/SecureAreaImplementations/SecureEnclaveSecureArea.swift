@@ -27,22 +27,22 @@ public class SecureEnclaveSecureArea: SecureArea, @unchecked Sendable {
     }
 
     /// make key and return key tag
-    public func createKey(id: String, keyOptions: KeyOptions?) throws -> CoseKey {
+    public func createKey(id: String, keyOptions: KeyOptions?) async throws -> CoseKey {
         if let keyOptions, keyOptions.curve != Self.defaultEcCurve { throw SecureAreaError("Unsupported curve \(keyOptions.curve)") }
         let key = try SecureEnclave.P256.KeyAgreement.PrivateKey()
-        try storage.writeKeyInfo(id: id, dict: [kSecValueData as String: key.publicKey.x963Representation])
-        try storage.writeKeyData(id: id, dict: [kSecValueData as String: key.dataRepresentation], keyOptions: keyOptions)
+        try await storage.writeKeyInfo(id: id, dict: [kSecValueData as String: key.publicKey.x963Representation])
+        try await storage.writeKeyData(id: id, dict: [kSecValueData as String: key.dataRepresentation], keyOptions: keyOptions)
         return CoseKey(crv: .P256, x963Representation: key.publicKey.x963Representation)
     }
 
     /// delete key
-    public func deleteKey(id: String) throws {
-        try storage.deleteKey(id: id)
+    public func deleteKey(id: String) async throws {
+        try await storage.deleteKey(id: id)
     }
     /// compute signature
-    public func signature(id: String, algorithm: SigningAlgorithm, dataToSign: Data, unlockData: Data?) throws -> (raw: Data, der: Data) {
+    public func signature(id: String, algorithm: SigningAlgorithm, dataToSign: Data, unlockData: Data?) async throws -> (raw: Data, der: Data) {
         guard algorithm == .ES256 else { throw SecureAreaError("Unsupported algorithm \(algorithm)") }
-        let keyDataDict = try storage.readKeyData(id: id)
+        let keyDataDict = try await storage.readKeyData(id: id)
         guard let dataRepresentation = keyDataDict[kSecValueData as String] else { throw SecureAreaError("Key data not found") }
         let signingKey = try SecureEnclave.P256.Signing.PrivateKey(dataRepresentation: dataRepresentation)
         let signature = try signingKey.signature(for: dataToSign)
@@ -50,9 +50,9 @@ public class SecureEnclaveSecureArea: SecureArea, @unchecked Sendable {
     }
 
     /// make shared secret with other public key
-    public func keyAgreement(id: String, publicKey: CoseKey, unlockData: Data?) throws -> SharedSecret {
+    public func keyAgreement(id: String, publicKey: CoseKey, unlockData: Data?) async throws -> SharedSecret {
         let puk256 = try P256.KeyAgreement.PublicKey(x963Representation: publicKey.getx963Representation())
-        let keyDataDict = try storage.readKeyData(id: id)
+        let keyDataDict = try await storage.readKeyData(id: id)
         guard let dataRepresentation = keyDataDict[kSecValueData as String] else { throw SecureAreaError("Key data not found") }
         let prk256 = try SecureEnclave.P256.KeyAgreement.PrivateKey(dataRepresentation: dataRepresentation)
         let sharedSecret = try prk256.sharedSecretFromKeyAgreement(with: puk256)
@@ -60,14 +60,14 @@ public class SecureEnclaveSecureArea: SecureArea, @unchecked Sendable {
     }
 
     /// returns information about the key with the given key
-    public func getKeyInfo(id: String) throws -> KeyInfo {
+    public func getKeyInfo(id: String) async throws -> KeyInfo {
         do {
-            let keyInfoDict = try storage.readKeyInfo(id: id)
+            let keyInfoDict = try await storage.readKeyInfo(id: id)
             guard let x963Representation = keyInfoDict[kSecValueData as String] else { throw SecureAreaError("Key info not found") }
             let keyInfo = KeyInfo(publicKey: CoseKey(crv: .P256, x963Representation: x963Representation))
             return keyInfo
         } catch {
-            let keyDataDict = try storage.readKeyData(id: id)
+            let keyDataDict = try await storage.readKeyData(id: id)
             guard let dataRepresentation = keyDataDict[kSecValueData as String] else { throw SecureAreaError("Key data not found") }
             let prk256 = try SecureEnclave.P256.KeyAgreement.PrivateKey(dataRepresentation: dataRepresentation)
             let keyInfo = KeyInfo(publicKey: CoseKey(crv: .P256, x963Representation: prk256.publicKey.x963Representation))
