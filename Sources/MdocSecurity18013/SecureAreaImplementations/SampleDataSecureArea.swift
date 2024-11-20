@@ -1,12 +1,12 @@
 /*
  Copyright (c) 2023 European Commission
- 
+
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
- 
+
  http://www.apache.org/licenses/LICENSE-2.0
- 
+
  Unless required by applicable law or agreed to in writing, software
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,16 +15,16 @@
  */
 
 import Foundation
-import CryptoKit
+@preconcurrency import CryptoKit
 import Security
 import MdocDataModel18013
 /// Sample data secure area
 ///
 /// This SecureArea implementation uses iOS Cryptokit framework
-public class SampleDataSecureArea: SecureArea, @unchecked Sendable {
+public actor SampleDataSecureArea: SecureArea {
     public var storage: any SecureKeyStorage
     public var x963Key: Data?
-    
+
     required public init(storage: any SecureKeyStorage) {
         self.storage = storage
     }
@@ -48,7 +48,7 @@ public class SampleDataSecureArea: SecureArea, @unchecked Sendable {
         try await storage.writeKeyData(id: id, dict: [kSecValueData as String: x963Priv], keyOptions: keyOptions)
         return CoseKey(crv: curve, x963Representation: x963Pub)
     }
-    
+
     /// delete key
     public func deleteKey(id: String) async throws {
         try await storage.deleteKey(id: id)
@@ -58,13 +58,13 @@ public class SampleDataSecureArea: SecureArea, @unchecked Sendable {
         let softwareSA = SoftwareSecureArea(storage: storage)
         return try await softwareSA.signature(id: id, algorithm: algorithm, dataToSign: dataToSign, unlockData: unlockData)
     }
-    
+
     /// make shared secret with other public key
     public func keyAgreement(id: String, publicKey: CoseKey, unlockData: Data?) async throws -> SharedSecret {
         let softwareSA = SoftwareSecureArea(storage: storage)
         return try await softwareSA.keyAgreement(id: id, publicKey: publicKey, unlockData: unlockData)
     }
-    
+
     /// returns information about the key with the given key
     public func getKeyInfo(id: String) async throws -> KeyInfo {
         let softwareSA = SoftwareSecureArea(storage: storage)

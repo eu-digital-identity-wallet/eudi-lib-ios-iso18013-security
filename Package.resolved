@@ -1,5 +1,5 @@
 {
-  "originHash" : "f933db6753b748561be289f8e384280afc85f4982077283e8d81ae0c63bf4302",
+  "originHash" : "ebe666e303d63fe77bec10e12b73f26acef813546fddd9c00ff597f43537d025",
   "pins" : [
     {
       "identity" : "eudi-lib-ios-iso18013-data-model",
@@ -7,7 +7,7 @@
       "location" : "https://github.com/niscy-eudiw/eudi-lib-ios-iso18013-data-model.git",
       "state" : {
         "branch" : "SecureArea",
-        "revision" : "7d07e1babe4ff7840c6fc9f6043166dcd0177bb8"
+        "revision" : "48a78884b22d8d1abd0d26138a7712f684c8157c"
       }
     },
     {
@@ -42,8 +42,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-crypto.git",
       "state" : {
-        "revision" : "21f7878f2b39d46fd8ba2b06459ccb431cdf876c",
-        "version" : "3.8.1"
+        "revision" : "06dc63c6d8da54ee11ceb268cde1fa68161afc96",
+        "version" : "3.9.1"
       }
     },
     {
