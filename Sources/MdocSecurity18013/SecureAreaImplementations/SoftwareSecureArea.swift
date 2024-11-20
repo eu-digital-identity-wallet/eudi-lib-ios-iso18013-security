@@ -1,12 +1,12 @@
 /*
  Copyright (c) 2023 European Commission
- 
+
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
- 
+
  http://www.apache.org/licenses/LICENSE-2.0
- 
+
  Unless required by applicable law or agreed to in writing, software
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -40,31 +40,31 @@ public class SoftwareSecureArea: SecureArea, @unchecked Sendable {
         try await storage.writeKeyData(id: id, dict: [kSecValueData as String: x963Priv], keyOptions: keyOptions)
         return CoseKey(crv: curve, x963Representation: x963Pub)
     }
-    
+
     /// delete key
     public func deleteKey(id: String) async throws {
         try await storage.deleteKey(id: id)
     }
     /// compute signature
-    public func signature(id: String, algorithm: SigningAlgorithm, dataToSign: Data, unlockData: Data?) async throws -> (raw: Data, der: Data) {
+    public func signature(id: String, algorithm: SigningAlgorithm, dataToSign: Data, unlockData: Data?) async throws -> Data {
         let x963Priv = try await getKeyData(id: id)
         switch algorithm {
         case .ES256:
             let signingKey = try P256.Signing.PrivateKey(x963Representation: x963Priv)
             let signature = try signingKey.signature(for: dataToSign)
-            return (signature.rawRepresentation, signature.derRepresentation)
+            return signature.rawRepresentation
         case .ES384:
             let signingKey = try P384.Signing.PrivateKey(x963Representation: x963Priv)
             let signature = try signingKey.signature(for: dataToSign)
-            return (signature.rawRepresentation, signature.derRepresentation)
+            return signature.rawRepresentation
         case .ES512:
             let signingKey = try P521.Signing.PrivateKey(x963Representation: x963Priv)
             let signature = try signingKey.signature(for: dataToSign)
-            return (signature.rawRepresentation, signature.derRepresentation)
+            return signature.rawRepresentation
         default: throw SecureAreaError("Unsupported algorithm \(algorithm)")
         }
     }
-    
+
     /// make shared secret with other public key
     public func keyAgreement(id: String, publicKey: CoseKey, unlockData: Data?) async throws -> SharedSecret {
         let sharedSecret: SharedSecret
@@ -87,7 +87,7 @@ public class SoftwareSecureArea: SecureArea, @unchecked Sendable {
         }
         return sharedSecret
     }
-    
+
     /// returns information about the key with the given key
     public func getKeyInfo(id: String) async throws -> KeyInfo {
         let publicKey: CoseKey
@@ -105,14 +105,14 @@ public class SoftwareSecureArea: SecureArea, @unchecked Sendable {
         let keyInfo = KeyInfo(publicKey: publicKey)
         return keyInfo
     }
-    
+
     func getInfoAndCurve(id: String) async throws -> ([String:Data], CoseEcCurve) {
         let keyInfoDict = try await storage.readKeyInfo(id: id)
         guard let jwkNameData = keyInfoDict[kSecAttrDescription as String], let jwkName = String(data: jwkNameData, encoding: .utf8) else { throw SecureAreaError("Key info description not found") }
         let curve = try CoseEcCurve.fromJwkName(jwkName)
         return (keyInfoDict, curve)
     }
-    
+
     func getKeyData(id: String) async throws -> Data {
         let keyDataDict = try await storage.readKeyData(id: id)
         guard let x963Representation = keyDataDict[kSecValueData as String] else { throw SecureAreaError("Key data not found") }

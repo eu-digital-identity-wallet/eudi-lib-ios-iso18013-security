@@ -54,7 +54,7 @@ public actor SampleDataSecureArea: SecureArea {
         try await storage.deleteKey(id: id)
     }
     /// compute signature
-    public func signature(id: String, algorithm: SigningAlgorithm, dataToSign: Data, unlockData: Data?) async throws -> (raw: Data, der: Data) {
+    public func signature(id: String, algorithm: SigningAlgorithm, dataToSign: Data, unlockData: Data?) async throws -> Data {
         let softwareSA = SoftwareSecureArea(storage: storage)
         return try await softwareSA.signature(id: id, algorithm: algorithm, dataToSign: dataToSign, unlockData: unlockData)
     }

@@ -30,9 +30,9 @@ extension Cose {
 		let dataToSign = coseIn.signatureStruct!
         let signature = try await deviceKey.secureArea.signature(id: deviceKey.privateKeyId, algorithm: alg.signingAlgorithm, dataToSign: dataToSign, unlockData: unlockData)
 		// return COSE_SIGN1 struct
-        return Cose(type: .sign1, algorithm: alg.rawValue, signature: signature.raw)
+        return Cose(type: .sign1, algorithm: alg.rawValue, signature: signature)
 	}
-	
+
 	/// Validate (verify) a detached COSE-Sign1 structure according to https://datatracker.ietf.org/doc/html/rfc8152#section-4.4
 	/// - Parameters:
 	///   - payloadData: Payload data signed

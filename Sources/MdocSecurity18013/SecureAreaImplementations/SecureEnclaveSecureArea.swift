@@ -40,13 +40,13 @@ public class SecureEnclaveSecureArea: SecureArea, @unchecked Sendable {
         try await storage.deleteKey(id: id)
     }
     /// compute signature
-    public func signature(id: String, algorithm: SigningAlgorithm, dataToSign: Data, unlockData: Data?) async throws -> (raw: Data, der: Data) {
+    public func signature(id: String, algorithm: SigningAlgorithm, dataToSign: Data, unlockData: Data?) async throws -> Data {
         guard algorithm == .ES256 else { throw SecureAreaError("Unsupported algorithm \(algorithm)") }
         let keyDataDict = try await storage.readKeyData(id: id)
         guard let dataRepresentation = keyDataDict[kSecValueData as String] else { throw SecureAreaError("Key data not found") }
         let signingKey = try SecureEnclave.P256.Signing.PrivateKey(dataRepresentation: dataRepresentation)
         let signature = try signingKey.signature(for: dataToSign)
-        return (signature.rawRepresentation, signature.derRepresentation)
+        return signature.rawRepresentation
     }
 
     /// make shared secret with other public key
