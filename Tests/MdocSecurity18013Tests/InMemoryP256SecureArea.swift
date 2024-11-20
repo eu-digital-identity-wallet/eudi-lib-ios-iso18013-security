@@ -30,7 +30,7 @@ public final class InMemoryP256SecureArea: SecureArea, @unchecked Sendable {
 
     public func createKey(id: String, keyOptions: MdocDataModel18013.KeyOptions?) async throws -> MdocDataModel18013.CoseKey {
         key = if let x963Key { try P256.Signing.PrivateKey(x963Representation: x963Key) } else { P256.Signing.PrivateKey() }
-        guard let privateKey = SecKeyCreateWithData(key.x963Representation as NSData, [kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom, kSecAttrKeyClass: kSecAttrKeyClassPrivate] as NSDictionary, nil) else {  throw NSError(domain: "", code: 0, userInfo: [NSLocalizedDescriptionKey : "Error creating private key"])  }
+        guard SecKeyCreateWithData(key.x963Representation as NSData, [kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom, kSecAttrKeyClass: kSecAttrKeyClassPrivate] as NSDictionary, nil) != nil else {  throw NSError(domain: "", code: 0, userInfo: [NSLocalizedDescriptionKey : "Error creating private key"])  }
         return CoseKey(crv: .P256, x963Representation: key.publicKey.x963Representation)
     }
 
@@ -55,7 +55,7 @@ public final class InMemoryP256SecureArea: SecureArea, @unchecked Sendable {
     }
 }
 
-public final class DummySecureKeyStorage: MdocDataModel18013.SecureKeyStorage {
+public actor DummySecureKeyStorage: MdocDataModel18013.SecureKeyStorage {
     public func readKeyInfo(id: String) async throws -> [String : Data] {
         [:]
     }
@@ -65,17 +65,17 @@ public final class DummySecureKeyStorage: MdocDataModel18013.SecureKeyStorage {
     }
 
     public func writeKeyInfo(id: String, dict: [String : Data]) async throws {
-        
+
     }
 
     public func writeKeyData(id: String, dict: [String : Data], keyOptions: MdocDataModel18013.KeyOptions?) async throws {
-        
+
     }
 
     public func deleteKey(id: String) async throws {
-        
+
     }
-    
+
 }
 
 extension MdocDataModel18013.CoseKeyPrivate {
@@ -86,9 +86,9 @@ extension MdocDataModel18013.CoseKeyPrivate {
         let keyData = NSMutableData(bytes: [0x04], length: [0x04].count)
         keyData.append(Data(coseKey.x)); keyData.append(Data(coseKey.y)); keyData.append(Data(rd))
         sampleSA.x963Key = keyData as Data
-        try? self.init(secureArea: sampleSA)
+        self.init(secureArea: sampleSA)
     }
-    
+
     /// Create a COSE_Key from Elliptic Curve paramters of the private key.
     /// - Parameters:
     ///   - x: /// value of x-coordinate
@@ -100,6 +100,7 @@ extension MdocDataModel18013.CoseKeyPrivate {
         let keyData = NSMutableData(bytes: [0x04], length: [0x04].count)
         keyData.append(Data(x)); keyData.append(Data(y)); keyData.append(Data(d))
         sampleSA.x963Key = keyData as Data
-        try! self.init(secureArea: sampleSA)
+        self.init(secureArea: sampleSA)
+        self.key = CoseKey(x: x, y: y, crv: crv)
     }
 }

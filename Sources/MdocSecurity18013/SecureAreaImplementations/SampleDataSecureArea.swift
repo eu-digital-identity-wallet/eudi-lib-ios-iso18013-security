@@ -22,10 +22,10 @@ import MdocDataModel18013
 ///
 /// This SecureArea implementation uses iOS Cryptokit framework
 public actor SampleDataSecureArea: SecureArea {
-    public var storage: any SecureKeyStorage
+    public let storage: any SecureKeyStorage
     public var x963Key: Data?
 
-    required public init(storage: any SecureKeyStorage) {
+    public init(storage: any SecureKeyStorage) {
         self.storage = storage
     }
     /// make key and return key tag
