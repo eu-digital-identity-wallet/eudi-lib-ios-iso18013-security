@@ -23,7 +23,7 @@ import MdocDataModel18013
 /// This SecureArea implementation uses iOS Cryptokit framework
 public actor SampleDataSecureArea: SecureArea {
     public let storage: any SecureKeyStorage
-    public var x963Key: Data?
+    public nonisolated(unsafe) var x963Key: Data?
 
     public init(storage: any SecureKeyStorage) {
         self.storage = storage
