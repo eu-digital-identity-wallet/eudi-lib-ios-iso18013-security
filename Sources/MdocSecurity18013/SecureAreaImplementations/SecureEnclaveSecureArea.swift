@@ -20,9 +20,9 @@ import MdocDataModel18013
 /// Secure Enclave secure area
 ///
 /// This SecureArea implementation is designed to utilize the Secure Enclave, a specialized hardware component found in iOS devices. The Secure Enclave acts as a hardware-based key manager, providing a secure environment for handling cryptographic keys and operations.
-public class SecureEnclaveSecureArea: SecureArea, @unchecked Sendable {
+public actor SecureEnclaveSecureArea: SecureArea {
     public var storage: any SecureKeyStorage
-    required public init(storage: any SecureKeyStorage) {
+    public init(storage: any SecureKeyStorage) {
         self.storage = storage
     }
 

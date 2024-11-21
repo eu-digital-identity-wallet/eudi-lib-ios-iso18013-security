@@ -21,9 +21,9 @@ import MdocDataModel18013
 /// Software secure area
 ///
 /// This SecureArea implementation uses iOS Cryptokit framework
-public class SoftwareSecureArea: SecureArea, @unchecked Sendable {
+public actor SoftwareSecureArea: SecureArea {
     public var storage: any SecureKeyStorage
-    required public init(storage: any SecureKeyStorage) {
+    public init(storage: any SecureKeyStorage) {
         self.storage = storage
     }
     /// make key and return key tag
