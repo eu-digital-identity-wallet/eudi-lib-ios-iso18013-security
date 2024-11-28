@@ -58,23 +58,25 @@ final class MdocSecurity18013Tests: XCTestCase {
         let dse = try XCTUnwrap(try CBOR.decode([UInt8](Self.AnnexdTestData.d51_sessionEstablishData)))
         let se: SessionEstablishment = try XCTUnwrap(SessionEstablishment(cbor: dse))
         var de = try XCTUnwrap(DeviceEngagement(data: transcript.devEngRawData!))
-        de.setD(d: Self.AnnexdTestData.d51_ephDeviceKey.d)
+        de.privateKey = Self.AnnexdTestData.d51_ephDeviceKey
         var sessionEncr = try XCTUnwrap(SessionEncryption(se: se, de: de, handOver: transcript.handOver))
 		sessionEncr.deviceEngagementRawData = try XCTUnwrap(transcript.devEngRawData) // cbor encoding differs between implemenentations, for mDL with our own implementation they will be identical
         return (se, sessionEncr)
     }
-     
-      func test_decrypt_session_establishment_annex_d51() throws {
+
+      func test_decrypt_session_establishment_annex_d51() async throws {
         var (se,sessionEncr) = try XCTUnwrap(make_session_encryption_from_annex_data())
  		XCTAssertEqual(Self.AnnexdTestData.d51_sessionTranscriptData, Data(sessionEncr.sessionTranscriptBytes))
-        let data = try XCTUnwrap(try sessionEncr.decrypt(se.data))
+        let d = try await sessionEncr.decrypt(se.data)
+        let data = try XCTUnwrap(d)
         let cbor = try XCTUnwrap(try CBOR.decode(data))
         print("Decrypted request:\n", cbor)
     }
 
-    func test_compute_DeviceAuthenticationBytes_and_MacStructure_annex_d53() throws {
+    func test_compute_DeviceAuthenticationBytes_and_MacStructure_annex_d53() async throws {
         let (_,sessionEncr) = try XCTUnwrap(make_session_encryption_from_annex_data())
-        let authKeys = CoseKeyExchange(publicKey: Self.AnnexdTestData.d51_ephReaderKey.key, privateKey: Self.AnnexdTestData.d53_deviceKey)
+        var authKeys = CoseKeyExchange(publicKey: Self.AnnexdTestData.d51_ephReaderKey.key, privateKey: Self.AnnexdTestData.d53_deviceKey)
+        if authKeys.privateKey.privateKeyId == nil { try await authKeys.privateKey.makeKey(curve: CoseEcCurve.P256) }
         let mdocAuth = MdocAuthentication(transcript: sessionEncr.transcript, authKeys: authKeys)
         let da = DeviceAuthentication(sessionTranscript: mdocAuth.transcript, docType: "org.iso.18013.5.1.mDL", deviceNameSpacesRawData: [0xA0])
         XCTAssertEqual(Data(da.toCBOR(options: CBOROptions()).taggedEncoded.encode(options: CBOROptions())), AnnexdTestData.d53_deviceAuthDeviceAuthenticationBytes)
@@ -83,13 +85,15 @@ final class MdocSecurity18013Tests: XCTestCase {
         XCTAssertEqual(dataToSign, AnnexdTestData.d53_deviceAuthMacStructure)
     }
 
-    func test_compute_deviceAuth_CBOR_data() throws {
+    func test_compute_deviceAuth_CBOR_data() async throws {
         let (_,sessionEncr) = try XCTUnwrap(make_session_encryption_from_annex_data())
-        let authKeys = CoseKeyExchange(publicKey: Self.AnnexdTestData.d51_ephReaderKey.key, privateKey: Self.AnnexdTestData.d53_deviceKey)
+        var authKeys = CoseKeyExchange(publicKey: Self.AnnexdTestData.d51_ephReaderKey.key, privateKey: Self.AnnexdTestData.d53_deviceKey)
+        if authKeys.privateKey.privateKeyId == nil { try await authKeys.privateKey.makeKey(curve: CoseEcCurve.P256) }
         let mdocAuth = MdocAuthentication(transcript: sessionEncr.transcript, authKeys: authKeys)
 		let bUseDeviceSign = UserDefaults.standard.bool(forKey: "PreferDeviceSignature")
-		let deviceAuth = try XCTUnwrap(try mdocAuth.getDeviceAuthForTransfer(docType: "org.iso.18013.5.1.mDL", deviceNameSpacesRawData: [0xA0], 
-            dauthMethod: bUseDeviceSign ? .deviceSignature : .deviceMac))
+        let dAuthO = try await mdocAuth.getDeviceAuthForTransfer(docType: "org.iso.18013.5.1.mDL", deviceNameSpacesRawData: [0xA0],
+            dauthMethod: bUseDeviceSign ? .deviceSignature : .deviceMac, unlockData: nil)
+		let deviceAuth = try XCTUnwrap(dAuthO)
         let ourDeviceAuthCBORbytes = deviceAuth.encode(options: CBOROptions())
         XCTAssertEqual(Data(ourDeviceAuthCBORbytes), AnnexdTestData.d53_deviceAuthCBORdata)
     }

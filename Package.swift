@@ -14,7 +14,7 @@ let package = Package(
     ],
     dependencies: [
  		.package(url: "https://github.com/apple/swift-docc-plugin", from: "1.0.0"),
-        .package(url: "https://github.com/eu-digital-identity-wallet/eudi-lib-ios-iso18013-data-model.git", exact: "0.3.3"), 
+        .package(url: "https://github.com/eu-digital-identity-wallet/eudi-lib-ios-iso18013-data-model.git", exact: "0.4.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.5.3"),
         .package(url: "https://github.com/apple/swift-certificates.git", .upToNextMajor(from: "1.0.0"))
     ],
@@ -23,7 +23,7 @@ let package = Package(
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
             name: "MdocSecurity18013", dependencies: [
-                .product(name: "MdocDataModel18013", package: "eudi-lib-ios-iso18013-data-model"), 
+                .product(name: "MdocDataModel18013", package: "eudi-lib-ios-iso18013-data-model"),
                  .product(name: "Logging", package: "swift-log"),
                  .product(name: "X509", package: "swift-certificates"),
                 ]),
