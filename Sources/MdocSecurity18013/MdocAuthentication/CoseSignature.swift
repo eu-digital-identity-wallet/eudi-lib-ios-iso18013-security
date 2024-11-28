@@ -25,43 +25,14 @@ extension Cose {
 	///   - deviceKey: static device private key (encoded with ANSI x.963 or stored in SE)
 	///   - alg: The algorithm to sign with
 	/// - Returns: a detached COSE-Sign1 structure
-	public static func makeDetachedCoseSign1(payloadData: Data, deviceKey: CoseKeyPrivate, alg: Cose.VerifyAlgorithm) throws-> Cose {
+    public static func makeDetachedCoseSign1(payloadData: Data, deviceKey: CoseKeyPrivate, alg: Cose.VerifyAlgorithm, unlockData: Data?) async throws -> Cose {
 		let coseIn = Cose(type: .sign1, algorithm: alg.rawValue, payloadData: payloadData)
 		let dataToSign = coseIn.signatureStruct!
-		let signature: Data
-		if let keyID = deviceKey.secureEnclaveKeyID {
-			let signingKey = try SecureEnclave.P256.Signing.PrivateKey(dataRepresentation: keyID)
-			signature = (try! signingKey.signature(for: dataToSign)).rawRepresentation
-		} else {
-			signature = try computeSignatureValue(dataToSign, deviceKey_x963: deviceKey.getx963Representation(), alg: alg)
-		}
+        let signature = try await deviceKey.secureArea.signature(id: deviceKey.privateKeyId, algorithm: alg.signingAlgorithm, dataToSign: dataToSign, unlockData: unlockData)
 		// return COSE_SIGN1 struct
-		return Cose(type: .sign1, algorithm: alg.rawValue, signature: signature)
+        return Cose(type: .sign1, algorithm: alg.rawValue, signature: signature)
 	}
-	
-	/// Generates an Elliptic Curve Digital Signature Algorithm (ECDSA) signature of the provide data over an elliptic curve. Apple Crypto implementation is used
-	/// - Parameters:
-	///   - dataToSign: Data to create the signature for (payload)
-	///   - deviceKey_x963: x963 representation of the private key
-	///   - alg: ``MdocDataModel18013/Cose.VerifyAlgorithm``
-	/// - Returns: The signature corresponding to the data
-	public static func computeSignatureValue(_ dataToSign: Data, deviceKey_x963: Data, alg: Cose.VerifyAlgorithm) throws -> Data {
-		let sign1Value: Data
-		switch alg {
-		case .es256:
-			let signingKey = try P256.Signing.PrivateKey(x963Representation: deviceKey_x963)
-			sign1Value = (try! signingKey.signature(for: dataToSign)).rawRepresentation
-		case .es384:
-			let signingKey = try P384.Signing.PrivateKey(x963Representation: deviceKey_x963)
-			sign1Value = (try! signingKey.signature(for: dataToSign)).rawRepresentation
-		case .es512:
-			let signingKey = try P521.Signing.PrivateKey(x963Representation: deviceKey_x963)
-			sign1Value = (try! signingKey.signature(for: dataToSign)).rawRepresentation
-		}
-		return sign1Value
-	}
-	
-	
+
 	/// Validate (verify) a detached COSE-Sign1 structure according to https://datatracker.ietf.org/doc/html/rfc8152#section-4.4
 	/// - Parameters:
 	///   - payloadData: Payload data signed
