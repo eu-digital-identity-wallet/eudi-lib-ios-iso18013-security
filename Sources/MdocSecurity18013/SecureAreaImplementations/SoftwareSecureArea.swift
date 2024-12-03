@@ -22,9 +22,15 @@ import MdocDataModel18013
 ///
 /// This SecureArea implementation uses iOS Cryptokit framework
 public actor SoftwareSecureArea: SecureArea {
-    public var storage: any SecureKeyStorage
-    public init(storage: any SecureKeyStorage) {
+
+    var storage: any SecureKeyStorage
+    init(storage: any SecureKeyStorage) {
         self.storage = storage
+    }
+    public func getStorage() async -> any MdocDataModel18013.SecureKeyStorage { storage }
+
+    nonisolated public static func create(storage: any MdocDataModel18013.SecureKeyStorage) -> SoftwareSecureArea {
+        SoftwareSecureArea(storage: storage)
     }
     /// make key and return key tag
     public func createKey(id: String, keyOptions: KeyOptions?) async throws -> CoseKey {
