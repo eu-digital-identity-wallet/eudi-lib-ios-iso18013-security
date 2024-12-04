@@ -21,10 +21,16 @@ import MdocDataModel18013
 ///
 /// This SecureArea implementation is designed to utilize the Secure Enclave, a specialized hardware component found in iOS devices. The Secure Enclave acts as a hardware-based key manager, providing a secure environment for handling cryptographic keys and operations.
 public actor SecureEnclaveSecureArea: SecureArea {
-    public var storage: any SecureKeyStorage
-    public init(storage: any SecureKeyStorage) {
+
+    var storage: any SecureKeyStorage
+    init(storage: any SecureKeyStorage) {
         self.storage = storage
     }
+    
+    nonisolated public static func create(storage: any MdocDataModel18013.SecureKeyStorage) -> SecureEnclaveSecureArea {
+        SecureEnclaveSecureArea(storage: storage)
+    }
+    public func getStorage() async -> any MdocDataModel18013.SecureKeyStorage { storage }
 
     /// make key and return key tag
     public func createKey(id: String, keyOptions: KeyOptions?) async throws -> CoseKey {

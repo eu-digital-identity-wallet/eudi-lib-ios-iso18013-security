@@ -25,10 +25,14 @@ public actor SampleDataSecureArea: SecureArea {
     public let storage: any SecureKeyStorage
     public nonisolated(unsafe) var x963Key: Data?
 
-    public init(storage: any SecureKeyStorage) {
+    init(storage: any SecureKeyStorage) {
         self.storage = storage
     }
-    /// make key and return key tag
+    nonisolated public static func create(storage: any MdocDataModel18013.SecureKeyStorage) -> SampleDataSecureArea {
+        SampleDataSecureArea(storage: storage)
+    }
+    public func getStorage() async -> any MdocDataModel18013.SecureKeyStorage { storage }
+   /// make key and return key tag
     public func createKey(id: String, keyOptions: KeyOptions?) async throws -> CoseKey {
         let x963Priv: Data; let x963Pub: Data
         let curve = keyOptions?.curve ?? .P256
