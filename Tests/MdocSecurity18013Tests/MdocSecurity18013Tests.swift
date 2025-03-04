@@ -105,7 +105,7 @@ final class MdocSecurity18013Tests: XCTestCase {
 			let mdocAuth = MdocReaderAuthentication(transcript: sessionEncr.transcript)
 			guard let readerAuthRawCBOR = docR.readerAuthRawCBOR else { continue }
 			let (b, message) = try mdocAuth.validateReaderAuth(readerAuthCBOR: readerAuthRawCBOR, readerAuthX5c: docR.readerCertificates, itemsRequestRawData: docR.itemsRequestRawData!)
-			XCTAssertTrue(b, "Reader auth signature not validated")
+			XCTAssertTrue(!b, "Current date not in validity period of Certificate")
             print(message ?? "")
 		}
 	}
