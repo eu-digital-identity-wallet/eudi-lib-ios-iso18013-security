@@ -40,7 +40,7 @@ public struct MdocReaderAuthentication: Sendable {
 		let secCerts = readerAuthX5c.compactMap { SecCertificateCreateWithData(nil, $0 as CFData) }
 		guard secCerts.count > 0, secCerts.count == readerAuthX5c.count else { return (false, "Invalid reader Auth Certificate") }
 		guard let readerAuth = Cose(type: .sign1, cbor: readerAuthCBOR) else { return (false, "Invalid reader auth CBOR") }
-		guard let publicKeyx963 = SecurityHelpers.getPublicKeyx963(ref: secCerts.last!) else { return (false, "Public key not found in certificate") }
+		guard let publicKeyx963 = SecurityHelpers.getPublicKeyx963(ref: secCerts.first!) else { return (false, "Public key not found in certificate") }
 		let b1 = try readerAuth.validateDetachedCoseSign1(payloadData: Data(contentBytes), publicKey_x963: publicKeyx963)
 		guard b1 else { return (false, "Reader auth signature validation failed") }
 		let b2 = SecurityHelpers.isMdocX5cValid(secCerts: secCerts, usage: .mdocReaderAuth, rootCerts: rootCerts ?? [])
