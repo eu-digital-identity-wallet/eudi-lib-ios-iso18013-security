@@ -40,7 +40,20 @@ public actor SecureEnclaveSecureArea: SecureArea {
         try await storage.writeKeyData(id: id, dict: [kSecValueData as String: key.dataRepresentation], keyOptions: keyOptions)
         return CoseKey(crv: .P256, x963Representation: key.publicKey.x963Representation)
     }
-
+    
+    public func createKeyBatch(id: String, keyOptions: KeyOptions?, batchSize: UInt64) async throws -> [CoseKey] {
+        var res: [CoseKey] = [try await createKey(id: id, keyOptions: keyOptions)]
+        var dicts = [[String: Data]](); dicts.reserveCapacity(Int(batchSize-1))
+        // create extra keys and save them as a batch with indexes from 1 to batch-size
+        for _ in 1..<batchSize {
+            let key = try SecureEnclave.P256.KeyAgreement.PrivateKey()
+            dicts.append([kSecValueData as String: key.dataRepresentation])
+            res.append(CoseKey(crv: .P256, x963Representation: key.publicKey.x963Representation))
+        }
+        try await storage.writeKeyDataBatch(id: id, dicts: dicts, keyOptions: keyOptions)
+        return res
+    }
+    
     /// delete key
     public func deleteKey(id: String) async throws {
         try await storage.deleteKey(id: id)

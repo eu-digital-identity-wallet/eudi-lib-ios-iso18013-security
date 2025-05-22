@@ -37,7 +37,12 @@ public actor InMemoryP256SecureArea: SecureArea {
         guard SecKeyCreateWithData(key.x963Representation as NSData, [kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom, kSecAttrKeyClass: kSecAttrKeyClassPrivate] as NSDictionary, nil) != nil else {  throw NSError(domain: "", code: 0, userInfo: [NSLocalizedDescriptionKey : "Error creating private key"])  }
         return CoseKey(crv: .P256, x963Representation: key.publicKey.x963Representation)
     }
-
+    
+    public func createKeyBatch(id: String, keyOptions: KeyOptions?, batchSize: UInt64) async throws -> [CoseKey] {
+        let res = try await createKey(id: id, keyOptions: keyOptions)
+        return [res]
+    }
+    
     public func deleteKey(id: String) throws {
     }
 

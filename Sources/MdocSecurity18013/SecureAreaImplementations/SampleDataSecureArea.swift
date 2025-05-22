@@ -52,7 +52,12 @@ public actor SampleDataSecureArea: SecureArea {
         try await storage.writeKeyData(id: id, dict: [kSecValueData as String: x963Priv], keyOptions: keyOptions)
         return CoseKey(crv: curve, x963Representation: x963Pub)
     }
-
+    
+    public func createKeyBatch(id: String, keyOptions: KeyOptions?, batchSize: UInt64) async throws -> [CoseKey] {
+        let res = try await createKey(id: id, keyOptions: keyOptions)
+        return [res]
+    }
+    
     /// delete key
     public func deleteKey(id: String) async throws {
         try await storage.deleteKey(id: id)

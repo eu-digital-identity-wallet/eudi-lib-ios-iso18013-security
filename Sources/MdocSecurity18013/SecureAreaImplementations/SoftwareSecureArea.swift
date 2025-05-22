@@ -32,21 +32,37 @@ public actor SoftwareSecureArea: SecureArea {
     nonisolated public static func create(storage: any MdocDataModel18013.SecureKeyStorage) -> SoftwareSecureArea {
         SoftwareSecureArea(storage: storage)
     }
+    
+    public func createKeyMaterial(ecCurve: CoseEcCurve) throws -> (x963Priv: Data, x963Pub: Data) {
+        switch ecCurve {
+        case .P256: let key = P256.Signing.PrivateKey(compactRepresentable: false); return (key.x963Representation, key.publicKey.x963Representation)
+        case .P384: let key = P384.Signing.PrivateKey(compactRepresentable: false); return (key.x963Representation, key.publicKey.x963Representation)
+        case .P521: let key = P521.Signing.PrivateKey(compactRepresentable: false); return (key.x963Representation, key.publicKey.x963Representation)
+        default: throw SecureAreaError("Unsupported curve \(ecCurve)")
+        }
+    }
+    
     /// make key and return key tag
     public func createKey(id: String, keyOptions: KeyOptions?) async throws -> CoseKey {
-        let x963Priv: Data; let x963Pub: Data
-        let curve = keyOptions?.curve ?? .P256
-        switch curve {
-        case .P256: let key = P256.Signing.PrivateKey(compactRepresentable: false); x963Priv = key.x963Representation; x963Pub = key.publicKey.x963Representation
-        case .P384: let key = P384.Signing.PrivateKey(compactRepresentable: false); x963Priv = key.x963Representation; x963Pub = key.publicKey.x963Representation
-        case .P521: let key = P521.Signing.PrivateKey(compactRepresentable: false); x963Priv = key.x963Representation; x963Pub = key.publicKey.x963Representation
-        default: throw SecureAreaError("Unsupported curve \(curve)")
-        }
-        try await storage.writeKeyInfo(id: id, dict: [kSecValueData as String: x963Pub, kSecAttrDescription as String: curve.jwkName.data(using: .utf8)!])
+        let ecCurve = keyOptions?.curve ?? .P256
+        let (x963Priv, x963Pub) = try createKeyMaterial(ecCurve: ecCurve)
+        try await storage.writeKeyInfo(id: id, dict: [kSecValueData as String: x963Pub, kSecAttrDescription as String: ecCurve.jwkName.data(using: .utf8)!])
         try await storage.writeKeyData(id: id, dict: [kSecValueData as String: x963Priv], keyOptions: keyOptions)
-        return CoseKey(crv: curve, x963Representation: x963Pub)
+        return CoseKey(crv: ecCurve, x963Representation: x963Pub)
     }
-
+    
+    public func createKeyBatch(id: String, keyOptions: KeyOptions?, batchSize: UInt64) async throws -> [CoseKey] {
+        var res: [CoseKey] = [try await createKey(id: id, keyOptions: keyOptions)]
+        var dicts = [[String: Data]]();  dicts.reserveCapacity(Int(batchSize-1))
+        for _ in 1..<batchSize {
+            let (x963Priv, x963Pub) = try createKeyMaterial(ecCurve: res.first!.crv)
+            dicts.append([kSecValueData as String: x963Priv])
+            res.append(CoseKey(crv: .P256, x963Representation: x963Pub))
+        }
+        try await storage.writeKeyDataBatch(id: id, dicts: dicts, keyOptions: keyOptions)
+        return res
+    }
+    
     /// delete key
     public func deleteKey(id: String) async throws {
         try await storage.deleteKey(id: id)
