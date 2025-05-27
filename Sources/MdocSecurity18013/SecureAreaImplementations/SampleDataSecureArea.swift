@@ -32,10 +32,11 @@ public actor SampleDataSecureArea: SecureArea {
         SampleDataSecureArea(storage: storage)
     }
     public func getStorage() async -> any MdocDataModel18013.SecureKeyStorage { storage }
-   /// make key and return key tag
-    public func createKey(id: String, keyOptions: KeyOptions?) async throws -> CoseKey {
+    
+    public func createKeyBatch(id: String, keyOptions: KeyOptions?) async throws -> [CoseKey] {
         let x963Priv: Data; let x963Pub: Data
         let curve = keyOptions?.curve ?? .P256
+        let batchSize = keyOptions?.batchSize ?? 1
         switch curve {
         case .P256:
             let key = if let x963Key { try P256.Signing.PrivateKey(x963Representation: x963Key) } else { P256.Signing.PrivateKey() }
@@ -48,36 +49,33 @@ public actor SampleDataSecureArea: SecureArea {
             x963Priv = key.x963Representation; x963Pub = key.publicKey.x963Representation
         default: throw SecureAreaError("Unsupported curve \(curve)")
         }
-        try await storage.writeKeyInfo(id: id, dict: [kSecValueData as String: x963Pub, kSecAttrDescription as String: curve.jwkName.data(using: .utf8)!])
-        try await storage.writeKeyData(id: id, dict: [kSecValueData as String: x963Priv], keyOptions: keyOptions)
-        return CoseKey(crv: curve, x963Representation: x963Pub)
-    }
-    
-    public func createKeyBatch(id: String, keyOptions: KeyOptions?, batchSize: UInt64) async throws -> [CoseKey] {
-        let res = try await createKey(id: id, keyOptions: keyOptions)
-        return [res]
+        let batchSizeData = withUnsafeBytes(of: batchSize.littleEndian) { Data($0) }
+        let kbi = KeyBatchInfo(secureAreaName: Self.name, crv: curve, usedCounts: [0], credentialPolicy: .rotateUse)
+        try await storage.writeKeyInfo(id: id, dict: [kSecValueData as String: kbi.toData() ?? Data(), kSecAttrDescription as String: curve.jwkName.data(using: .utf8)!])
+        try await storage.writeKeyDataBatch(id: id, startIndex: 0, dicts: [[kSecValueData as String: x963Priv]], keyOptions: keyOptions)
+        return [CoseKey(crv: curve, x963Representation: x963Pub)]
     }
     
     /// delete key
-    public func deleteKey(id: String) async throws {
-        try await storage.deleteKey(id: id)
+    public func deleteKeyBatch(id: String, batchSize: Int) async throws {
+        try await storage.deleteKeyBatch(id: id, batchSize: batchSize)
     }
     /// compute signature
-    public func signature(id: String, algorithm: SigningAlgorithm, dataToSign: Data, unlockData: Data?) async throws -> Data {
+    public func signature(id: String, index: Int, algorithm: SigningAlgorithm, dataToSign: Data, unlockData: Data?) async throws -> Data {
         let softwareSA = SoftwareSecureArea(storage: storage)
-        return try await softwareSA.signature(id: id, algorithm: algorithm, dataToSign: dataToSign, unlockData: unlockData)
+        return try await softwareSA.signature(id: id, index: index, algorithm: algorithm, dataToSign: dataToSign, unlockData: unlockData)
     }
 
     /// make shared secret with other public key
-    public func keyAgreement(id: String, publicKey: CoseKey, unlockData: Data?) async throws -> SharedSecret {
+    public func keyAgreement(id: String, index: Int, publicKey: CoseKey, unlockData: Data?) async throws -> SharedSecret {
         let softwareSA = SoftwareSecureArea(storage: storage)
-        return try await softwareSA.keyAgreement(id: id, publicKey: publicKey, unlockData: unlockData)
+        return try await softwareSA.keyAgreement(id: id, index: index, publicKey: publicKey, unlockData: unlockData)
     }
 
     /// returns information about the key with the given key
-    public func getKeyInfo(id: String) async throws -> KeyInfo {
+    public func getKeyBatchInfo(id: String) async throws -> KeyBatchInfo {
         let softwareSA = SoftwareSecureArea(storage: storage)
-        return try await softwareSA.getKeyInfo(id: id)
+        return try await softwareSA.getKeyBatchInfo(id: id)
     }
 
 }
