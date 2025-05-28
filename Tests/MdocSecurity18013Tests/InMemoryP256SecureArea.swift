@@ -44,7 +44,7 @@ public actor InMemoryP256SecureArea: SecureArea {
         return [res]
     }
     
-    public func deleteKeyBatch(id: String, batchSize: Int) throws { }
+    public func deleteKeyBatch(id: String, startIndex: Int, batchSize: Int) throws { }
 
     public func signature(id: String, index: Int, algorithm: MdocDataModel18013.SigningAlgorithm, dataToSign: Data, unlockData: Data? = nil) async throws -> Data {
         let signature = try key.signature(for: dataToSign)
@@ -72,7 +72,7 @@ public actor DummySecureKeyStorage: MdocDataModel18013.SecureKeyStorage {
 
     public func writeKeyInfo(id: String, dict: [String : Data]) async throws {  }
 
-    public func deleteKeyBatch(id: String, batchSize: Int) async throws {  }
+    public func deleteKeyBatch(id: String, startIndex: Int, batchSize: Int) async throws {  }
 
 }
 

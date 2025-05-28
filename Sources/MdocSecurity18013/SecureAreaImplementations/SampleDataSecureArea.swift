@@ -22,6 +22,7 @@ import MdocDataModel18013
 ///
 /// This SecureArea implementation uses iOS Cryptokit framework
 public actor SampleDataSecureArea: SecureArea {
+
     public let storage: any SecureKeyStorage
     public nonisolated(unsafe) var x963Key: Data?
 
@@ -57,8 +58,8 @@ public actor SampleDataSecureArea: SecureArea {
     }
     
     /// delete key
-    public func deleteKeyBatch(id: String, batchSize: Int) async throws {
-        try await storage.deleteKeyBatch(id: id, batchSize: batchSize)
+    public func deleteKeyBatch(id: String, startIndex: Int, batchSize: Int) async throws {
+        try await storage.deleteKeyBatch(id: id, startIndex: startIndex, batchSize: batchSize)
     }
     /// compute signature
     public func signature(id: String, index: Int, algorithm: SigningAlgorithm, dataToSign: Data, unlockData: Data?) async throws -> Data {
@@ -77,5 +78,7 @@ public actor SampleDataSecureArea: SecureArea {
         let softwareSA = SoftwareSecureArea(storage: storage)
         return try await softwareSA.getKeyBatchInfo(id: id)
     }
-
+    public func deleteKeyInfo(id: String) async throws {
+        try await storage.deleteKeyInfo(id: id)
+    }
 }
