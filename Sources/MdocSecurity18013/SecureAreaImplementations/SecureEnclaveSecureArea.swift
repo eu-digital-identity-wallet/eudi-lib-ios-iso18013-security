@@ -64,6 +64,7 @@ public actor SecureEnclaveSecureArea: SecureArea {
         guard let dataRepresentation = keyDataDict[kSecValueData as String] else { throw SecureAreaError("Key data not found") }
         let signingKey = try SecureEnclave.P256.Signing.PrivateKey(dataRepresentation: dataRepresentation)
         let signature = try signingKey.signature(for: dataToSign)
+        logger.info("Creating signature for id: \(id), key index \(index)")
         return signature.rawRepresentation
     }
 
@@ -73,6 +74,7 @@ public actor SecureEnclaveSecureArea: SecureArea {
         let keyDataDict = try await storage.readKeyData(id: id, index: index)
         guard let dataRepresentation = keyDataDict[kSecValueData as String] else { throw SecureAreaError("Key data not found") }
         let prk256 = try SecureEnclave.P256.KeyAgreement.PrivateKey(dataRepresentation: dataRepresentation)
+        logger.info("Creating key agreement for id: \(id), key index \(index)")
         let sharedSecret = try prk256.sharedSecretFromKeyAgreement(with: puk256)
         return sharedSecret
     }

@@ -71,14 +71,17 @@ public actor SoftwareSecureArea: SecureArea {
         switch algorithm {
         case .ES256:
             let signingKey = try P256.Signing.PrivateKey(x963Representation: x963Priv)
+            logger.info("Creating signature with ES256 for id: \(id), key index \(index)")
             let signature = try signingKey.signature(for: dataToSign)
             return signature.rawRepresentation
         case .ES384:
             let signingKey = try P384.Signing.PrivateKey(x963Representation: x963Priv)
+            logger.info("Creating signature with ES384 for id: \(id), key index \(index)")
             let signature = try signingKey.signature(for: dataToSign)
             return signature.rawRepresentation
         case .ES512:
             let signingKey = try P521.Signing.PrivateKey(x963Representation: x963Priv)
+            logger.info("Creating signature with ES512 for id: \(id), key index \(index)")
             let signature = try signingKey.signature(for: dataToSign)
             return signature.rawRepresentation
         default: throw SecureAreaError("Unsupported algorithm \(algorithm)")
@@ -94,14 +97,17 @@ public actor SoftwareSecureArea: SecureArea {
         case .P256:
             let puk256 = try P256.KeyAgreement.PublicKey(x963Representation: publicKey.getx963Representation())
             let prk256 = try P256.KeyAgreement.PrivateKey(x963Representation: x963Priv)
+            logger.info("Creating P256 key agreement for id: \(id), key index \(index)")
             sharedSecret = try prk256.sharedSecretFromKeyAgreement(with: puk256)
         case .P384:
             let puk384 = try P384.KeyAgreement.PublicKey(x963Representation: publicKey.getx963Representation())
             let prk384 = try P384.KeyAgreement.PrivateKey(x963Representation: x963Priv)
+            logger.info("Creating P384 key agreement for id: \(id), key index \(index)")
             sharedSecret = try prk384.sharedSecretFromKeyAgreement(with: puk384)
         case .P521:
             let puk521 = try P521.KeyAgreement.PublicKey(x963Representation: publicKey.getx963Representation())
             let prk521 = try P521.KeyAgreement.PrivateKey(x963Representation: x963Priv)
+            logger.info("Creating P521 key agreement for id: \(id), key index \(index)")
             sharedSecret = try prk521.sharedSecretFromKeyAgreement(with: puk521)
         default: throw SecureAreaError("Unsupported curve \(publicKey.crv)")
         }

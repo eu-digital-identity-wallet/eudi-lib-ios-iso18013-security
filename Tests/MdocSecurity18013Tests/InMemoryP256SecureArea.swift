@@ -20,6 +20,8 @@ import Foundation
 import SwiftCBOR
 
 public actor InMemoryP256SecureArea: SecureArea {
+
+
     var storage: any MdocDataModel18013.SecureKeyStorage
     var key: P256.Signing.PrivateKey!
     public nonisolated(unsafe) var x963Key: Data?
@@ -30,21 +32,23 @@ public actor InMemoryP256SecureArea: SecureArea {
     nonisolated public static func create(storage: any MdocDataModel18013.SecureKeyStorage) -> InMemoryP256SecureArea {
         InMemoryP256SecureArea(storage: storage)
     }
-    
+
     public func getStorage() async -> any MdocDataModel18013.SecureKeyStorage { storage }
-    
+
     public func createKey(id: String, index: Int, keyOptions: MdocDataModel18013.KeyOptions?) async throws -> MdocDataModel18013.CoseKey {
         key = if let x963Key { try P256.Signing.PrivateKey(x963Representation: x963Key) } else { P256.Signing.PrivateKey() }
         guard SecKeyCreateWithData(key.x963Representation as NSData, [kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom, kSecAttrKeyClass: kSecAttrKeyClassPrivate] as NSDictionary, nil) != nil else {  throw NSError(domain: "", code: 0, userInfo: [NSLocalizedDescriptionKey : "Error creating private key"])  }
         return CoseKey(crv: .P256, x963Representation: key.publicKey.x963Representation)
     }
-    
+
     public func createKeyBatch(id: String, keyOptions: KeyOptions?) async throws -> [CoseKey] {
         let res = try await createKey(id: id, index: 0, keyOptions: keyOptions)
         return [res]
     }
-    
+
     public func deleteKeyBatch(id: String, startIndex: Int, batchSize: Int) throws { }
+
+    public func deleteKeyInfo(id: String) async throws {}
 
     public func signature(id: String, index: Int, algorithm: MdocDataModel18013.SigningAlgorithm, dataToSign: Data, unlockData: Data? = nil) async throws -> Data {
         let signature = try key.signature(for: dataToSign)
@@ -64,6 +68,7 @@ public actor InMemoryP256SecureArea: SecureArea {
 }
 
 public actor DummySecureKeyStorage: MdocDataModel18013.SecureKeyStorage {
+
     public func writeKeyDataBatch(id: String, startIndex: Int, dicts: [[String : Data]], keyOptions: MdocDataModel18013.KeyOptions?) async throws {  }
 
     public func readKeyInfo(id: String) async throws -> [String : Data] { [:] }
@@ -74,6 +79,7 @@ public actor DummySecureKeyStorage: MdocDataModel18013.SecureKeyStorage {
 
     public func deleteKeyBatch(id: String, startIndex: Int, batchSize: Int) async throws {  }
 
+    public func deleteKeyInfo(id: String) async throws { }
 }
 
 extension MdocDataModel18013.CoseKeyPrivate {
