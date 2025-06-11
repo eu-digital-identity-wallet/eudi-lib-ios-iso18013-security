@@ -27,7 +27,7 @@ import SwiftCBOR
 public struct MdocReaderAuthentication: Sendable {
 
     let transcript: SessionTranscript
-	
+
 	/// Validate the reader auth structure contained in the the reader's initial message
 	/// - Parameters:
 	///   - readerAuthCBOR: An untagged COSE-Sign1 structure containing the signature
@@ -40,14 +40,14 @@ public struct MdocReaderAuthentication: Sendable {
 		let secCerts = readerAuthX5c.compactMap { SecCertificateCreateWithData(nil, $0 as CFData) }
 		guard secCerts.count > 0, secCerts.count == readerAuthX5c.count else { return (false, "Invalid reader Auth Certificate") }
 		guard let readerAuth = Cose(type: .sign1, cbor: readerAuthCBOR) else { return (false, "Invalid reader auth CBOR") }
-		guard let publicKeyx963 = SecurityHelpers.getPublicKeyx963(ref: secCerts.last!) else { return (false, "Public key not found in certificate") }
+		guard let publicKeyx963 = SecurityHelpers.getPublicKeyx963(ref: secCerts.first!) else { return (false, "Public key not found in certificate") }
 		let b1 = try readerAuth.validateDetachedCoseSign1(payloadData: Data(contentBytes), publicKey_x963: publicKeyx963)
 		guard b1 else { return (false, "Reader auth signature validation failed") }
 		let b2 = SecurityHelpers.isMdocX5cValid(secCerts: secCerts, usage: .mdocReaderAuth, rootCerts: rootCerts ?? [])
 		if !b2.isValid { logger.warning(Logger.Message(unicodeScalarLiteral: b2.validationMessages.joined(separator: "\n"))) }
-		return (b1, b2.validationMessages.joined(separator: "\n"))
+		return (b1 && b2.isValid, b2.validationMessages.joined(separator: "\n"))
 	}
-	
+
 	public init(transcript: SessionTranscript) {
 		self.transcript = transcript
 	}

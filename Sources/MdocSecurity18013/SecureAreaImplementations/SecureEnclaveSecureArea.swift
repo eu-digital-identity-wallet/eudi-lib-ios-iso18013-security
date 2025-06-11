@@ -32,52 +32,51 @@ public actor SecureEnclaveSecureArea: SecureArea {
     }
     public func getStorage() async -> any MdocDataModel18013.SecureKeyStorage { storage }
 
-    /// make key and return key tag
-    public func createKey(id: String, keyOptions: KeyOptions?) async throws -> CoseKey {
+    public func createKeyBatch(id: String, keyOptions: KeyOptions?) async throws -> [CoseKey] {
         if let keyOptions, keyOptions.curve != Self.defaultEcCurve { throw SecureAreaError("Unsupported curve \(keyOptions.curve)") }
-        let key = try SecureEnclave.P256.KeyAgreement.PrivateKey()
-        try await storage.writeKeyInfo(id: id, dict: [kSecValueData as String: key.publicKey.x963Representation])
-        try await storage.writeKeyData(id: id, dict: [kSecValueData as String: key.dataRepresentation], keyOptions: keyOptions)
-        return CoseKey(crv: .P256, x963Representation: key.publicKey.x963Representation)
+        let batchSize = keyOptions?.batchSize ?? 1
+        var res: [CoseKey] = []; res.reserveCapacity(batchSize)
+        var dicts = [[String: Data]](); dicts.reserveCapacity(batchSize)
+        // create extra keys and save them as a batch with indexes from 1 to batch-size
+        for _ in 0..<batchSize {
+            let key = try SecureEnclave.P256.KeyAgreement.PrivateKey()
+            dicts.append([kSecValueData as String: key.dataRepresentation])
+            res.append(CoseKey(crv: .P256, x963Representation: key.publicKey.x963Representation))
+        }
+        let kbi = KeyBatchInfo(secureAreaName: Self.name, crv: .P256, usedCounts: Array(repeating: 0, count: batchSize), credentialPolicy: keyOptions?.credentialPolicy ?? .rotateUse)
+        try await storage.writeKeyInfo(id: id, dict: [kSecValueData as String: kbi.toData() ?? Data(), kSecAttrDescription as String: Self.defaultEcCurve.jwkName.data(using: .utf8)!])
+        try await storage.writeKeyDataBatch(id: id, startIndex: 0, dicts: dicts, keyOptions: keyOptions)
+        return res
     }
-
+    
     /// delete key
-    public func deleteKey(id: String) async throws {
-        try await storage.deleteKey(id: id)
+    public func deleteKeyBatch(id: String, startIndex: Int, batchSize: Int) async throws {
+        try await storage.deleteKeyBatch(id: id, startIndex: startIndex, batchSize: batchSize)
+    }
+    
+    public func deleteKeyInfo(id: String) async throws {
+        try await storage.deleteKeyInfo(id: id)
     }
     /// compute signature
-    public func signature(id: String, algorithm: SigningAlgorithm, dataToSign: Data, unlockData: Data?) async throws -> Data {
+    public func signature(id: String, index: Int, algorithm: SigningAlgorithm, dataToSign: Data, unlockData: Data?) async throws -> Data {
         guard algorithm == .ES256 else { throw SecureAreaError("Unsupported algorithm \(algorithm)") }
-        let keyDataDict = try await storage.readKeyData(id: id)
+        let keyDataDict = try await storage.readKeyData(id: id, index: index)
         guard let dataRepresentation = keyDataDict[kSecValueData as String] else { throw SecureAreaError("Key data not found") }
         let signingKey = try SecureEnclave.P256.Signing.PrivateKey(dataRepresentation: dataRepresentation)
         let signature = try signingKey.signature(for: dataToSign)
+        logger.info("Creating signature for id: \(id), key index \(index)")
         return signature.rawRepresentation
     }
 
     /// make shared secret with other public key
-    public func keyAgreement(id: String, publicKey: CoseKey, unlockData: Data?) async throws -> SharedSecret {
+    public func keyAgreement(id: String, index: Int, publicKey: CoseKey, unlockData: Data?) async throws -> SharedSecret {
         let puk256 = try P256.KeyAgreement.PublicKey(x963Representation: publicKey.getx963Representation())
-        let keyDataDict = try await storage.readKeyData(id: id)
+        let keyDataDict = try await storage.readKeyData(id: id, index: index)
         guard let dataRepresentation = keyDataDict[kSecValueData as String] else { throw SecureAreaError("Key data not found") }
         let prk256 = try SecureEnclave.P256.KeyAgreement.PrivateKey(dataRepresentation: dataRepresentation)
+        logger.info("Creating key agreement for id: \(id), key index \(index)")
         let sharedSecret = try prk256.sharedSecretFromKeyAgreement(with: puk256)
         return sharedSecret
     }
 
-    /// returns information about the key with the given key
-    public func getKeyInfo(id: String) async throws -> KeyInfo {
-        do {
-            let keyInfoDict = try await storage.readKeyInfo(id: id)
-            guard let x963Representation = keyInfoDict[kSecValueData as String] else { throw SecureAreaError("Key info not found") }
-            let keyInfo = KeyInfo(publicKey: CoseKey(crv: .P256, x963Representation: x963Representation))
-            return keyInfo
-        } catch {
-            let keyDataDict = try await storage.readKeyData(id: id)
-            guard let dataRepresentation = keyDataDict[kSecValueData as String] else { throw SecureAreaError("Key data not found") }
-            let prk256 = try SecureEnclave.P256.KeyAgreement.PrivateKey(dataRepresentation: dataRepresentation)
-            let keyInfo = KeyInfo(publicKey: CoseKey(crv: .P256, x963Representation: prk256.publicKey.x963Representation))
-            return keyInfo
-        }
-    }
 }
