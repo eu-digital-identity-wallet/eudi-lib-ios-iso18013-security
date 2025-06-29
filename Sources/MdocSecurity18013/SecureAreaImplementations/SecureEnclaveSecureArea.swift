@@ -26,7 +26,9 @@ public actor SecureEnclaveSecureArea: SecureArea {
     init(storage: any SecureKeyStorage) {
         self.storage = storage
     }
-    
+
+    public static var supportedEcCurves: [CoseEcCurve] { [.P256] }
+
     nonisolated public static func create(storage: any MdocDataModel18013.SecureKeyStorage) -> SecureEnclaveSecureArea {
         SecureEnclaveSecureArea(storage: storage)
     }
@@ -48,12 +50,12 @@ public actor SecureEnclaveSecureArea: SecureArea {
         try await storage.writeKeyDataBatch(id: id, startIndex: 0, dicts: dicts, keyOptions: keyOptions)
         return res
     }
-    
+
     /// delete key
     public func deleteKeyBatch(id: String, startIndex: Int, batchSize: Int) async throws {
         try await storage.deleteKeyBatch(id: id, startIndex: startIndex, batchSize: batchSize)
     }
-    
+
     public func deleteKeyInfo(id: String) async throws {
         try await storage.deleteKeyInfo(id: id)
     }

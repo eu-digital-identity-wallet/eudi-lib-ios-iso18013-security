@@ -32,6 +32,7 @@ public actor SampleDataSecureArea: SecureArea {
     nonisolated public static func create(storage: any MdocDataModel18013.SecureKeyStorage) -> SampleDataSecureArea {
         SampleDataSecureArea(storage: storage)
     }
+    public static var supportedEcCurves: [CoseEcCurve] { [.P256, .P384, .P521] }
     public func getStorage() async -> any MdocDataModel18013.SecureKeyStorage { storage }
     
     public func createKeyBatch(id: String, keyOptions: KeyOptions?) async throws -> [CoseKey] {

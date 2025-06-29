@@ -27,6 +27,9 @@ public actor SoftwareSecureArea: SecureArea {
     init(storage: any SecureKeyStorage) {
         self.storage = storage
     }
+
+    public static var supportedEcCurves: [CoseEcCurve] { [.P256, .P384, .P521] }
+
     public func getStorage() async -> any MdocDataModel18013.SecureKeyStorage { storage }
 
     nonisolated public static func create(storage: any MdocDataModel18013.SecureKeyStorage) -> SoftwareSecureArea {
