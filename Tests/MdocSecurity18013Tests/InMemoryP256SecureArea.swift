@@ -21,7 +21,6 @@ import SwiftCBOR
 
 public actor InMemoryP256SecureArea: SecureArea {
 
-
     var storage: any MdocDataModel18013.SecureKeyStorage
     var key: P256.Signing.PrivateKey!
     public nonisolated(unsafe) var x963Key: Data?
@@ -32,6 +31,7 @@ public actor InMemoryP256SecureArea: SecureArea {
     nonisolated public static func create(storage: any MdocDataModel18013.SecureKeyStorage) -> InMemoryP256SecureArea {
         InMemoryP256SecureArea(storage: storage)
     }
+    public static var supportedEcCurves: [CoseEcCurve] { [.P256] }
 
     public func getStorage() async -> any MdocDataModel18013.SecureKeyStorage { storage }
 
