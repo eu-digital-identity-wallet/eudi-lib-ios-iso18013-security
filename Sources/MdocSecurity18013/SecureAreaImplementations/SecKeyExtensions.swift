@@ -105,6 +105,7 @@ extension SecKey {
         var error: Unmanaged<CFError>?
         let keyO = SecKeyCreateRandomKey([
             kSecAttrKeyType: type.secAttrKeyTypeValue,
+            kSecAttrKeyClass: kSecAttrKeyClassPrivate,
             kSecAttrKeySizeInBits: NSNumber(integerLiteral: bits),
         ] as CFDictionary, &error)
         // https://developer.apple.com/documentation/security/certificate_key_and_trust_services/keys/storing_keys_as_data
