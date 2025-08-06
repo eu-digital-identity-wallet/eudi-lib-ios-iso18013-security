@@ -77,8 +77,8 @@ final class MdocSecurity18013Tests: XCTestCase {
         let (_,sessionEncr) = try XCTUnwrap(make_session_encryption_from_annex_data())
         var authKeys = CoseKeyExchange(publicKey: Self.AnnexdTestData.d51_ephReaderKey.key, privateKey: Self.AnnexdTestData.d53_deviceKey)
         if authKeys.privateKey.privateKeyId == nil { try await authKeys.privateKey.makeKey(curve: CoseEcCurve.P256) }
-        let mdocAuth = MdocAuthentication(transcript: sessionEncr.transcript, authKeys: authKeys)
-        let da = DeviceAuthentication(sessionTranscript: mdocAuth.transcript, docType: "org.iso.18013.5.1.mDL", deviceNameSpacesRawData: [0xA0])
+        let mdocAuth = MdocAuthentication(sessionTranscript: sessionEncr.transcript, authKeys: authKeys)
+        let da = DeviceAuthentication(sessionTranscript: mdocAuth.sessionTranscript, docType: "org.iso.18013.5.1.mDL", deviceNameSpacesRawData: [0xA0])
         XCTAssertEqual(Data(da.toCBOR(options: CBOROptions()).taggedEncoded.encode(options: CBOROptions())), AnnexdTestData.d53_deviceAuthDeviceAuthenticationBytes)
         let coseIn = Cose(type: .mac0, algorithm: Cose.MacAlgorithm.hmac256.rawValue, payloadData: AnnexdTestData.d53_deviceAuthDeviceAuthenticationBytes)
 		let dataToSign = try XCTUnwrap(coseIn.signatureStruct)
@@ -89,7 +89,7 @@ final class MdocSecurity18013Tests: XCTestCase {
         let (_,sessionEncr) = try XCTUnwrap(make_session_encryption_from_annex_data())
         var authKeys = CoseKeyExchange(publicKey: Self.AnnexdTestData.d51_ephReaderKey.key, privateKey: Self.AnnexdTestData.d53_deviceKey)
         if authKeys.privateKey.privateKeyId == nil { try await authKeys.privateKey.makeKey(curve: CoseEcCurve.P256) }
-        let mdocAuth = MdocAuthentication(transcript: sessionEncr.transcript, authKeys: authKeys)
+        let mdocAuth = MdocAuthentication(sessionTranscript: sessionEncr.transcript, authKeys: authKeys)
 		let bUseDeviceSign = UserDefaults.standard.bool(forKey: "PreferDeviceSignature")
         let dAuthO = try await mdocAuth.getDeviceAuthForTransfer(docType: "org.iso.18013.5.1.mDL", deviceNameSpacesRawData: [0xA0],
             dauthMethod: bUseDeviceSign ? .deviceSignature : .deviceMac, unlockData: nil)

@@ -20,22 +20,22 @@ import MdocDataModel18013
 import SwiftCBOR
 
 /// Implements mdoc authentication
-/// 
+///
 /// The security objective of mdoc authentication is to prevent cloning of the mdoc and to mitigate man in the middle attacks.
 /// Currently the mdoc side is implemented (generation of device-auth)
-/// Initialized from the session transcript object, the device private key and the reader ephemeral public key 
-/// 
+/// Initialized from the session transcript object, the device private key and the reader ephemeral public key
+///
 /// ```swift
 /// let mdocAuth = MdocAuthentication(transcript: sessionEncr.transcript, authKeys: authKeys)
 /// ```
 public struct MdocAuthentication: Sendable {
-	
-    let transcript: SessionTranscript
+    // The session transcript object, can be a `SessionTranscript` or any other object that conforms to`CBOREncodable`
+    let sessionTranscript: CBOREncodable & Sendable
     let authKeys: CoseKeyExchange
-    var sessionTranscriptBytes: [UInt8] { transcript.toCBOR(options: CBOROptions()).taggedEncoded.encode(options: CBOROptions()) }
-	
-	public init(transcript: SessionTranscript, authKeys: CoseKeyExchange) {
-		self.transcript = transcript
+    var sessionTranscriptBytes: [UInt8] { sessionTranscript.toCBOR(options: CBOROptions()).taggedEncoded.encode(options: CBOROptions()) }
+
+	public init(sessionTranscript: CBOREncodable & Sendable, authKeys: CoseKeyExchange) {
+		self.sessionTranscript = sessionTranscript
 		self.authKeys = authKeys
 	}
 
@@ -46,7 +46,7 @@ public struct MdocAuthentication: Sendable {
 		let symmetricKey = try SessionEncryption.HMACKeyDerivationFunction(sharedSecret: sharedKey, salt: sessionTranscriptBytes, info: "EMacKey".data(using: .utf8)!)
 		return symmetricKey
 	}
-	
+
 	/// Generate a ``DeviceAuth`` structure used for mdoc-authentication
 	/// - Parameters:
 	///   - docType: docType of the document to authenticate
@@ -54,7 +54,7 @@ public struct MdocAuthentication: Sendable {
 	///   - bUseDeviceSign: Specify true for device authentication (false is default)
 	/// - Returns: DeviceAuth instance
     public func getDeviceAuthForTransfer(docType: String, deviceNameSpacesRawData: [UInt8] = [0xA0], dauthMethod: DeviceAuthMethod, unlockData: Data?) async throws -> DeviceAuth? {
-		let da = DeviceAuthentication(sessionTranscript: transcript, docType: docType, deviceNameSpacesRawData: deviceNameSpacesRawData)
+		let da = DeviceAuthentication(sessionTranscript: sessionTranscript, docType: docType, deviceNameSpacesRawData: deviceNameSpacesRawData)
 		let contentBytes = da.toCBOR(options: CBOROptions()).taggedEncoded.encode(options: CBOROptions())
 		let coseRes: Cose
 		if dauthMethod == .deviceSignature {
