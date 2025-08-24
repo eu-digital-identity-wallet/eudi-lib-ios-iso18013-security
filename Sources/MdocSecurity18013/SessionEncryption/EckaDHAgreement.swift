@@ -20,10 +20,10 @@ import Foundation
 import MdocDataModel18013
 
 extension CoseKeyExchange {
-
 	/// Computes a shared secret from the private key and the provided public key from another party.
-    public func makeEckaDHAgreement(unlockData: Data? = nil) async -> SharedSecret? {
-        let sharedSecret: SharedSecret? = try? await privateKey.secureArea.keyAgreement(id: privateKey.privateKeyId, index: privateKey.index, publicKey: publicKey, unlockData: unlockData)
+    public func makeEckaDHAgreement(unlockData: Data? = nil) async throws -> SharedSecret {
+        guard let publicKey else { throw NSError(domain: "CoseKeyExchange", code: 0, userInfo: [NSLocalizedDescriptionKey: "Public key is missing"]) }
+        let sharedSecret = try await privateKey.secureArea.keyAgreement(id: privateKey.privateKeyId, index: privateKey.index, publicKey: publicKey, unlockData: unlockData)
 		return sharedSecret
 	}	
 }
