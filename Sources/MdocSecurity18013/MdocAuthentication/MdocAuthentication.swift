@@ -42,7 +42,7 @@ public struct MdocAuthentication: Sendable {
 	/// Calculate the ephemeral MAC key, by performing ECKA-DH (Elliptic Curve Key Agreement Algorithm – Diffie-Hellman)
 	/// The inputs shall be the SDeviceKey.Priv and EReaderKey.Pub for the mdoc and EReaderKey.Priv and SDeviceKey.Pub for the mdoc reader.
     func makeMACKeyAggrementAndDeriveKey(deviceAuth: DeviceAuthentication) async throws -> SymmetricKey? {
-		guard let sharedKey = await authKeys.makeEckaDHAgreement() else { logger.error("Error in ECKA key MAC agreement"); return nil}
+		let sharedKey = try await authKeys.makeEckaDHAgreement()
 		let symmetricKey = try SessionEncryption.HMACKeyDerivationFunction(sharedSecret: sharedKey, salt: sessionTranscriptBytes, info: "EMacKey".data(using: .utf8)!)
 		return symmetricKey
 	}

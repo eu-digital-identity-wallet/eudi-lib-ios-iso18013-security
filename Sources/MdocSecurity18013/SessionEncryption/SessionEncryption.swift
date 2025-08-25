@@ -22,7 +22,7 @@ import SwiftCBOR
 /// Session encryption uses standard ephemeral key ECDH to establish session keys for authenticated symmetric encryption.
 /// The ``SessionEncryption`` struct implements session encryption (for the mDoc currently)
 /// It is initialized from a) the session establishment data received from the mdoc reader, b) the device engagement data generated from the mdoc and c) the handover data.
-/// 
+///
 /// ```swift
 /// var se = SessionEncryption(se: sessionEstablishmentObject, de: deviceEngagementObject, handOver: handOverObject)
 /// ```
@@ -38,7 +38,7 @@ public struct SessionEncryption: Sendable {
 	var deviceEngagementRawData: [UInt8]
 	let eReaderKeyRawData: [UInt8]
 	let handOver: CBOR
-	
+
 	/// Initialization of session encryption for the mdoc
 	/// - Parameters:
 	///   - se: session establishment data from the mdoc reader
@@ -54,7 +54,7 @@ public struct SessionEncryption: Sendable {
 		sessionKeys = CoseKeyExchange(publicKey: ok, privateKey: pk)
 		self.handOver = handOver
 	}
-	
+
 	/// Make nonce function to initialize the encryption or decryption
 	///
 	/// - Parameters:
@@ -69,48 +69,48 @@ public struct SessionEncryption: Sendable {
 		let nonce = try AES.GCM.Nonce(data: dataNonce)
 		return nonce
 	}
-	
-	/// computation of HKDF symmetric key 
+
+	/// computation of HKDF symmetric key
 	static func HMACKeyDerivationFunction(sharedSecret: SharedSecret, salt: [UInt8], info: Data) throws -> SymmetricKey {
 		let symmetricKey = sharedSecret.hkdfDerivedSymmetricKey(using: SHA256.self, salt: salt, sharedInfo: info, outputByteCount: 32)
 		return symmetricKey
 	}
-	
+
 	/// encrypt data using current nonce as described in 9.1.1.5 Cryptographic operations
 	mutating public func encrypt(_ data: [UInt8]) async throws -> [UInt8]? {
 		let nonce = try makeNonce(sessionCounter, isEncrypt: true)
-		guard let symmetricKeyForEncrypt = try await makeKeyAgreementAndDeriveSessionKey(isEncrypt: true) else { return nil }
-		guard let encryptedContent = try AES.GCM.seal(data, using: symmetricKeyForEncrypt, nonce: nonce).combined else { return nil }
+		let symmetricKeyForEncrypt = try await makeKeyAgreementAndDeriveSessionKey(isEncrypt: true)
+        guard let encryptedContent = try AES.GCM.seal(data, using: symmetricKeyForEncrypt, nonce: nonce).combined else { return nil }
 		if sessionRole == .mdoc { sessionCounter += 1 }
 		return [UInt8](encryptedContent.dropFirst(12))
 	}
-	
+
 	/// decryptes cipher data using the symmetric key
-	mutating public func decrypt(_ ciphertext: [UInt8]) async throws -> [UInt8]? {
+	mutating public func decrypt(_ ciphertext: [UInt8]) async throws -> [UInt8] {
 		let nonce = try makeNonce(sessionCounter, isEncrypt: false)
 		let sealedBox = try AES.GCM.SealedBox(combined: nonce + ciphertext)
-		guard let symmetricKeyForDecrypt = try await makeKeyAgreementAndDeriveSessionKey(isEncrypt: false) else { return nil }
+		let symmetricKeyForDecrypt = try await makeKeyAgreementAndDeriveSessionKey(isEncrypt: false)
 		let decryptedContent = try AES.GCM.open(sealedBox, using: symmetricKeyForDecrypt)
 		return [UInt8](decryptedContent)
 	}
-	public var transcript: SessionTranscript { SessionTranscript(devEngRawData: deviceEngagementRawData, eReaderRawData: eReaderKeyRawData, handOver: handOver) }
-	
+	public var sessionTranscript: SessionTranscript { SessionTranscript(devEngRawData: deviceEngagementRawData, eReaderRawData: eReaderKeyRawData, handOver: handOver) }
+
 	/// SessionTranscript = [DeviceEngagementBytes,EReaderKeyBytes,Handover]
 	public var sessionTranscriptBytes: [UInt8] {
-		let trCbor = transcript.taggedEncoded
+		let trCbor = sessionTranscript.taggedEncoded
 		return trCbor.encode(options: CBOROptions())
 	}
-	
+
 	func getInfo(isEncrypt: Bool) -> String { isEncrypt ? (sessionRole == .mdoc ? "SKDevice" : "SKReader") : (sessionRole == .mdoc ? "SKReader" : "SKDevice") }
-	
+
 	/// Session keys are derived using ECKA-DH (Elliptic Curve Key Agreement Algorithm – Diffie-Hellman) as defined in BSI TR-03111
-	mutating func makeKeyAgreementAndDeriveSessionKey(isEncrypt: Bool) async throws -> SymmetricKey?  {
+	mutating func makeKeyAgreementAndDeriveSessionKey(isEncrypt: Bool) async throws -> SymmetricKey  {
         if sessionKeys.privateKey.privateKeyId == nil { try await sessionKeys.privateKey.makeKey(curve: type(of: sessionKeys.privateKey.secureArea).defaultEcCurve) }
-		guard let sharedKey = await sessionKeys.makeEckaDHAgreement() else { logger.error("Error in ECKA session key agreement"); return nil} //.x963Representation)
+		let sharedKey = try await sessionKeys.makeEckaDHAgreement()
 		let symmetricKey = try Self.HMACKeyDerivationFunction(sharedSecret: sharedKey, salt: sessionTranscriptBytes, info: getInfo(isEncrypt: isEncrypt).data(using: .utf8)!)
 		return symmetricKey
 	}
 
-	
+
 }
 
