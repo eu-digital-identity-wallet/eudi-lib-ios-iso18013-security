@@ -21,21 +21,21 @@ import MdocDataModel18013
 
 /// Enumeration of possible validation errors when validating a Mobile Security Object (MSO)
 public enum MsoValidationError: LocalizedError, Sendable {
-    /// The digest algorithm is not supported
-    case unsupportedDigestAlgorithm
-    /// The digest value is missing
-    case missingDigestValue
-    /// The digest value does not match the calculated value
-    case invalidDigestValue(namespace: String)
+    case docTypeNotMatches
+    case unsupportedDigestAlgorithm(String)
+    case missingDigestValues(namespace: String, elementIdentifiers: [String])
+    case invalidDigestValues(namespace: String, elementIdentifiers: [String])
 
     public var errorDescription: String? {
         switch self {
-        case .unsupportedDigestAlgorithm:
-            return NSLocalizedString("The digest algorithm is not supported.", comment: "MsoValidationError")
-        case .missingDigestValue:
-            return NSLocalizedString("The digest value is missing.", comment: "MsoValidationError")
-        case .invalidDigestValue(let namespace):
-            return NSLocalizedString("The digest value for namespace '\(namespace)' is invalid.", comment: "MsoValidationError")
+        case .docTypeNotMatches:
+            return NSLocalizedString("The document type does not match the expected value.", comment: "MsoValidationError")
+        case .unsupportedDigestAlgorithm(let algorithm):
+            return NSLocalizedString("The digest algorithm \(algorithm) is not supported.", comment: "MsoValidationError")
+        case .missingDigestValues(let namespace, let elementIdentifiers):
+            return NSLocalizedString("The digest values are missing for namespace '\(namespace)' elements \(elementIdentifiers.joined(separator: ", "))", comment: "MsoValidationError")
+        case .invalidDigestValues(let namespace, let elementIdentifiers):
+            return NSLocalizedString("The digest values for namespace '\(namespace)' elements \(elementIdentifiers.joined(separator: ", ")) are invalid.", comment: "MsoValidationError")
         }
     }
 }
