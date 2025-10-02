@@ -15,28 +15,30 @@ limitations under the License.
 */
 
 import Foundation
-
 import Logging
-
 import MdocDataModel18013
-
 import SwiftCBOR
-
-import ValidationKit
+import X509
 
 extension IssuerSigned {
-    public func validateMSO(docType: String) -> (Bool, [MsoValidationError]) {
+    public func validateMSO(docType: String, trustedIACA: [SecCertificate]) throws(MsoValidationError) {
         // Perform validation logic here
         let msoValidationRules: [(MobileSecurityObject) -> [MsoValidationError]?] =
             [
                 { if $0.docType == docType { nil } else { [.docTypeNotMatches] } },
                 { if DigestAlgorithmKind(rawValue: $0.digestAlgorithm) != nil { nil } else { [.unsupportedDigestAlgorithm($0.digestAlgorithm)] } },
-                { self.validateDigestValues(mso: $0) }
+                { validateDigestValues(mso: $0) },
+                { validateValidityInfo(mso: $0) },
+                { _ in validateMsoSignature() },
+                { _ in validateTrustedIACA(trustedIACA) }
             ]
         let errors: [MsoValidationError] = msoValidationRules.compactMap { $0(issuerAuth.mso) }.flatMap { $0 }
-        return (errors.isEmpty, errors)
+        if !errors.isEmpty {
+            throw if errors.count == 1, let first = errors.first { first } else { .multipleErrors(errors) }
+        }
     }
 
+    // Validate the digest values in the MSO against the actual data elements
     func validateDigestValues(mso: MobileSecurityObject) -> [MsoValidationError]? {
         var errorList: [MsoValidationError] = []
         guard let nsItems = issuerNameSpaces?.nameSpaces,
@@ -51,6 +53,55 @@ extension IssuerSigned {
             }
         }
         return if errorList.isEmpty {nil } else { errorList }
+    }
+
+    func validateValidityInfo(mso: MobileSecurityObject) -> [MsoValidationError]? {
+        guard !issuerAuth.x5chain.isEmpty, let dsCert = try? X509.Certificate(derEncoded: issuerAuth.x5chain[0]) else { return [.signatureVerificationFailed("No issuer certificates provided in x5chain")] }
+        guard let sd = mso.validityInfo.signed.convertToLocalDate(), let vf = mso.validityInfo.validFrom.convertToLocalDate(), let vu = mso.validityInfo.validUntil.convertToLocalDate() else { return [.validityInfo("MSO validity contains invalid strings")]}
+        var errorList: [MsoValidationError] = []
+        if !(sd >= dsCert.notValidBefore && sd <= dsCert.notValidAfter) { errorList.append(.validityInfo("The 'signed' date is not within the validity period of the certificate in the MSO")) }
+		if !(vf <= .now && vf <= vu) { errorList.append(.validityInfo("Current timestamp is not equal or later than the ‘validFrom’ element")) }
+		if !(vu >= .now) { errorList.append(.validityInfo("Current timestamp is not less than the ‘validUntil’ element")) }
+        return errorList.isEmpty ? nil : errorList
+    }
+
+    // Verify the MSO signature using the ds certificate in x5chain
+    func validateMsoSignature() -> [MsoValidationError]? {
+        guard !issuerAuth.x5chain.isEmpty else { return [.signatureVerificationFailed("No issuer certificates provided in x5chain")] }
+        let chain = issuerAuth.x5chain.compactMap { try? X509.Certificate(derEncoded: $0) }
+        guard chain.count == issuerAuth.x5chain.count else { return [.signatureVerificationFailed("Invalid issuer certificate in x5chain")] }
+        // check all certificates are not iaca
+        for cert in chain {
+            if cert.issuer == cert.subject { return [.signatureVerificationFailed("Certificate in x5chain is a IACA certificate, expected end-entity certificate")] }
+        }
+        // Get the first certificate from the chain (the issuer certificate)
+        let dsCertData = Data(issuerAuth.x5chain[0])
+        // Extract the public key from the certificate
+        guard let publicKey = SecurityHelpers.getPublicKeyx963(publicCertData: dsCertData) else {
+            return [.signatureVerificationFailed("Failed to extract public key from issuer certificate")]
+        }
+        // Create a COSE structure for validation
+        let cose = Cose(type: .sign1, algorithm: issuerAuth.verifyAlgorithm.rawValue, signature: issuerAuth.signature)
+        // Validate the signature
+        do {
+            let isValid = try cose.validateDetachedCoseSign1(payloadData: Data(issuerAuth.msoRawData), publicKey_x963: publicKey)
+            if !isValid { return [.signatureVerificationFailed("Issuer authentication signature validation failed")] }
+        } catch {
+            return [.signatureVerificationFailed("Signature validation error: \(error.localizedDescription)")]
+        }
+        return nil
+    }
+
+    // Validate the issuer certificate against a list of trusted IACA certificates
+    func validateTrustedIACA(_ trustedIACA: [SecCertificate]) -> [MsoValidationError]? {
+        let secCerts = issuerAuth.x5chain.compactMap { SecCertificateCreateWithData(nil, Data($0) as CFData) }
+        guard secCerts.count > 0, secCerts.count == issuerAuth.x5chain.count else { return [.signatureVerificationFailed("Invalid issuer certificates in x5chain")] }
+        let b2 = SecurityHelpers.isMdocX5cValid(secCerts: secCerts, usage: .mdocAuth, rootCerts: trustedIACA)
+        if !b2.isValid {
+            let reasons = b2.validationMessages.joined(separator: "; ")
+            return [.signatureVerificationFailed("Issuer certificate validation failed: \(reasons)")]
+        }
+        return nil
     }
 
 }
