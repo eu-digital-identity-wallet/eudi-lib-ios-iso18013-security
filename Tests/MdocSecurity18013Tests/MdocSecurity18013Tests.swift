@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-
+import Foundation
 import Testing
 import SwiftCBOR
 
@@ -28,21 +28,19 @@ struct MdocSecurity18013Tests {
         let d = try #require(try CBOR.decode([UInt8](Self.AnnexdTestData.d51_sessionTranscriptData)))
         guard case let .tagged(_, v) = d, case let .byteString(bs) = v, let st = try CBOR.decode(bs) else {
             Issue.record("Not a tagged cbor"); return }
-        let transcript = try #require(SessionTranscript(cbor: st))
-        #expect(transcript != nil)
+        _ = try SessionTranscript(cbor: st)
     }
 
     @Test("Decode session establishment from annex D.5.1")
     func decodeSessionEstablishmentAnnexD51() throws {
         let d = try #require(try CBOR.decode([UInt8](Self.AnnexdTestData.d51_sessionEstablishData)))
-        let se: SessionEstablishment = try #require(SessionEstablishment(cbor: d))
-        #expect(se != nil)
+        _ = try SessionEstablishment(cbor: d)
     }
 
     @Test("Decode session data from annex D.5.1")
     func decodeSessionDataAnnexD51() throws {
         let d = try #require(try CBOR.decode([UInt8](Self.AnnexdTestData.d51_sessionData)))
-        let sd = try #require(SessionData(cbor: d))
+        let sd = try SessionData(cbor: d)
         #expect(sd.data != nil)
         #expect(sd.status == nil)
     }
@@ -50,7 +48,7 @@ struct MdocSecurity18013Tests {
     @Test("Decode session termination from annex D.5.1")
     func decodeSessionTerminationAnnexD51() throws {
         let d = try #require(try CBOR.decode([UInt8](Self.AnnexdTestData.d51_sessionTermination)))
-        let sd = try #require(SessionData(cbor: d))
+        let sd = try SessionData(cbor: d)
         #expect(sd.data == nil)
         #expect(sd.status != nil)
     }
@@ -59,10 +57,10 @@ struct MdocSecurity18013Tests {
         let d = try #require(try CBOR.decode([UInt8](Self.AnnexdTestData.d51_sessionTranscriptData)))
 		guard case let .tagged(t, v) = d, t == .encodedCBORDataItem, case let .byteString(bs) = v, let st = try CBOR.decode(bs) else {
              Issue.record("Not a tagged cbor"); return nil }
-        let transcript = try #require(SessionTranscript(cbor: st))
+        let transcript = try SessionTranscript(cbor: st)
         let dse = try #require(try CBOR.decode([UInt8](Self.AnnexdTestData.d51_sessionEstablishData)))
-        let se: SessionEstablishment = try #require(SessionEstablishment(cbor: dse))
-        var de = try #require(DeviceEngagement(data: transcript.devEngRawData!))
+        let se: SessionEstablishment = try SessionEstablishment(cbor: dse)
+        var de = try DeviceEngagement(data: transcript.devEngRawData!)
         de.privateKey = Self.AnnexdTestData.d51_ephDeviceKey
         var sessionEncr = try #require(SessionEncryption(se: se, de: de, handOver: transcript.handOver))
 		sessionEncr.deviceEngagementRawData = try #require(transcript.devEngRawData) // cbor encoding differs between implemenentations, for mDL with our own implementation they will be identical
@@ -73,8 +71,7 @@ struct MdocSecurity18013Tests {
       func decryptSessionEstablishmentAnnexD51() async throws {
         var (se,sessionEncr) = try #require(makeSessionEncryptionFromAnnexData())
  		#expect(Self.AnnexdTestData.d51_sessionTranscriptData == Data(sessionEncr.sessionTranscriptBytes))
-        let d = try await sessionEncr.decrypt(se.data)
-        let data = try #require(d)
+        let data = try await sessionEncr.decrypt(se.data)
         let cbor = try #require(try CBOR.decode(data))
         print("Decrypted request:\n", cbor)
     }
@@ -109,7 +106,7 @@ struct MdocSecurity18013Tests {
 	@Test("Validate readerAuth CBOR data")
 	func validateReaderAuthCBORData() throws {
 		let (_,sessionEncr) = try #require(makeSessionEncryptionFromAnnexData())
-		let dr = try #require(DeviceRequest(data: AnnexdTestData.request_d411.bytes))
+		let dr = try DeviceRequest(data: AnnexdTestData.request_d411.bytes)
 		for docR in dr.docRequests {
 			let mdocAuth = MdocReaderAuthentication(transcript: sessionEncr.sessionTranscript)
 			guard let readerAuthRawCBOR = docR.readerAuthRawCBOR else { continue }
