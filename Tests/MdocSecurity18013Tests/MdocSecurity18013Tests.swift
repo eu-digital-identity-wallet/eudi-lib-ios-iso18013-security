@@ -69,7 +69,7 @@ struct MdocSecurity18013Tests {
 
       @Test("Decrypt session establishment from annex D.5.1")
       func decryptSessionEstablishmentAnnexD51() async throws {
-        var (se,sessionEncr) = try #require(makeSessionEncryptionFromAnnexData())
+        var (se,sessionEncr) = try #require(try makeSessionEncryptionFromAnnexData())
  		#expect(Self.AnnexdTestData.d51_sessionTranscriptData == Data(sessionEncr.sessionTranscriptBytes))
         let data = try await sessionEncr.decrypt(se.data)
         let cbor = try #require(try CBOR.decode(data))
@@ -78,7 +78,7 @@ struct MdocSecurity18013Tests {
 
     @Test("Compute DeviceAuthenticationBytes and MacStructure from annex D.5.3")
     func computeDeviceAuthenticationBytesAndMacStructureAnnexD53() async throws {
-        let (_,sessionEncr) = try #require(makeSessionEncryptionFromAnnexData())
+        let (_,sessionEncr) = try #require(try makeSessionEncryptionFromAnnexData())
         var authKeys = CoseKeyExchange(publicKey: Self.AnnexdTestData.d51_ephReaderKey.key, privateKey: Self.AnnexdTestData.d53_deviceKey)
         if authKeys.privateKey.privateKeyId == nil { try await authKeys.privateKey.makeKey(curve: CoseEcCurve.P256) }
         let mdocAuth = MdocAuthentication(sessionTranscript: sessionEncr.sessionTranscript, authKeys: authKeys)
@@ -91,7 +91,7 @@ struct MdocSecurity18013Tests {
 
     @Test("Compute deviceAuth CBOR data")
     func computeDeviceAuthCBORData() async throws {
-        let (_,sessionEncr) = try #require(makeSessionEncryptionFromAnnexData())
+        let (_,sessionEncr) = try #require(try makeSessionEncryptionFromAnnexData())
         var authKeys = CoseKeyExchange(publicKey: Self.AnnexdTestData.d51_ephReaderKey.key, privateKey: Self.AnnexdTestData.d53_deviceKey)
         if authKeys.privateKey.privateKeyId == nil { try await authKeys.privateKey.makeKey(curve: CoseEcCurve.P256) }
         let mdocAuth = MdocAuthentication(sessionTranscript: sessionEncr.sessionTranscript, authKeys: authKeys)
@@ -105,7 +105,7 @@ struct MdocSecurity18013Tests {
 
 	@Test("Validate readerAuth CBOR data")
 	func validateReaderAuthCBORData() throws {
-		let (_,sessionEncr) = try #require(makeSessionEncryptionFromAnnexData())
+		let (_,sessionEncr) = try #require(try makeSessionEncryptionFromAnnexData())
 		let dr = try DeviceRequest(data: AnnexdTestData.request_d411.bytes)
 		for docR in dr.docRequests {
 			let mdocAuth = MdocReaderAuthentication(transcript: sessionEncr.sessionTranscript)
