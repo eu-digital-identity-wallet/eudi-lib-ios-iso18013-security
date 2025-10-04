@@ -21,18 +21,19 @@ import MdocDataModel18013
 
 /// Enumeration of possible validation errors when validating a Mobile Security Object (MSO)
 public indirect enum MsoValidationError: LocalizedError, Sendable {
-    case docTypeNotMatches
+    case docTypeNotMatches(String)
     case unsupportedDigestAlgorithm(String)
     case missingDigestValues(namespace: String, elementIdentifiers: [String])
     case invalidDigestValues(namespace: String, elementIdentifiers: [String])
     case signatureVerificationFailed(String)
     case validityInfo(String)
+    case issuerTrustFailed(String)
     case multipleErrors([MsoValidationError])
 
     public var errorDescription: String? {
         switch self {
-        case .docTypeNotMatches:
-            return NSLocalizedString("The document type does not match the expected value.", comment: "MsoValidationError")
+        case .docTypeNotMatches(let docType):
+            return NSLocalizedString("The document type does not match the expected value '\(docType)' ", comment: "MsoValidationError")
         case .unsupportedDigestAlgorithm(let algorithm):
             return NSLocalizedString("The digest algorithm \(algorithm) is not supported.", comment: "MsoValidationError")
         case .missingDigestValues(let namespace, let elementIdentifiers):
@@ -43,6 +44,8 @@ public indirect enum MsoValidationError: LocalizedError, Sendable {
             return NSLocalizedString("The MSO signature verification failed: \(reason)", comment: "MsoValidationError")
         case .validityInfo(let reason):
             return NSLocalizedString("MSO validity info check failed: \(reason)", comment: "MsoValidationError")
+        case .issuerTrustFailed(let reason):
+            return NSLocalizedString("MSO issuer trust check failed: \(reason)", comment: "MsoValidationError")
         case .multipleErrors(let errors):
             return NSLocalizedString("Multiple MSO validation errors occurred: \(errors.map { $0.errorDescription ?? "" }.joined(separator: "; "))", comment: "MsoValidationError")
         }

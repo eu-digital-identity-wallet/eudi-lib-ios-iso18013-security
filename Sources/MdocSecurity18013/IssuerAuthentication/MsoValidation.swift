@@ -25,7 +25,7 @@ extension IssuerSigned {
         // Perform validation logic here
         let msoValidationRules: [(MobileSecurityObject) -> [MsoValidationError]?] =
             [
-                { if $0.docType == docType { nil } else { [.docTypeNotMatches] } },
+                { if $0.docType == docType { nil } else { [.docTypeNotMatches($0.docType)] } },
                 { if DigestAlgorithmKind(rawValue: $0.digestAlgorithm) != nil { nil } else { [.unsupportedDigestAlgorithm($0.digestAlgorithm)] } },
                 { validateDigestValues(mso: $0) },
                 { validateValidityInfo(mso: $0) },
@@ -59,9 +59,9 @@ extension IssuerSigned {
         guard !issuerAuth.x5chain.isEmpty, let dsCert = try? X509.Certificate(derEncoded: issuerAuth.x5chain[0]) else { return [.signatureVerificationFailed("No issuer certificates provided in x5chain")] }
         guard let sd = mso.validityInfo.signed.convertToLocalDate(), let vf = mso.validityInfo.validFrom.convertToLocalDate(), let vu = mso.validityInfo.validUntil.convertToLocalDate() else { return [.validityInfo("MSO validity contains invalid strings")]}
         var errorList: [MsoValidationError] = []
-        if !(sd >= dsCert.notValidBefore && sd <= dsCert.notValidAfter) { errorList.append(.validityInfo("The 'signed' date is not within the validity period of the certificate in the MSO")) }
-		if !(vf <= .now && vf <= vu) { errorList.append(.validityInfo("Current timestamp is not equal or later than the ‘validFrom’ element")) }
-		if !(vu >= .now) { errorList.append(.validityInfo("Current timestamp is not less than the ‘validUntil’ element")) }
+        if !(sd >= dsCert.notValidBefore && sd <= dsCert.notValidAfter) { errorList.append(.validityInfo("The 'signed' date is not within the validity period of the certificate in the MSO: \(sd.formatted()) (\(dsCert.notValidBefore.formatted()) - \(dsCert.notValidAfter.formatted()))")) }
+		if !(vf <= .now && vf <= vu) { errorList.append(.validityInfo("Current timestamp is not equal or later than the ‘validFrom’ element: \(vf.formatted())")) }
+		if !(vu >= .now) { errorList.append(.validityInfo("Current timestamp is not less than the ‘validUntil’ element: \(vu.formatted())")) }
         return errorList.isEmpty ? nil : errorList
     }
 
@@ -99,7 +99,7 @@ extension IssuerSigned {
         let b2 = SecurityHelpers.isMdocX5cValid(secCerts: secCerts, usage: .mdocAuth, rootCerts: trustedIACA)
         if !b2.isValid {
             let reasons = b2.validationMessages.joined(separator: "; ")
-            return [.signatureVerificationFailed("Issuer certificate validation failed: \(reasons)")]
+            return [.issuerTrustFailed("Issuer certificate validation failed: \(reasons)")]
         }
         return nil
     }
