@@ -25,7 +25,7 @@ struct CRL: PEMParseable, DERParseable {
 	var subject: UTCTime
 	var revokedSerials: [CRLSerialInfo] = []
 	static let defaultPEMDiscriminator: String = "X509 CRL"
-	
+
 	struct CRLSerialInfo: DERImplicitlyTaggable, CustomStringConvertible {
 		let serial: Certificate.SerialNumber // ArraySlice<UInt8>
 		let date: UTCTime
@@ -36,12 +36,12 @@ struct CRL: PEMParseable, DERParseable {
 			serial = Certificate.SerialNumber(bytes: snBytes)
 			date = try UTCTime(derEncoded: &nodesIter)
 		}
-		
+
 		static let defaultIdentifier: SwiftASN1.ASN1Identifier = .sequence
 		func serialize(into coder: inout SwiftASN1.DER.Serializer, withIdentifier identifier: SwiftASN1.ASN1Identifier) throws { } // not used
 		var description: String { serial.description }
 	}
-	
+
 	init(derEncoded node: SwiftASN1.ASN1Node) throws {
 		guard case .constructed(let nodes) = node.content else { throw Self.toError(node: node) }
 		var nodesIter = nodes.makeIterator()
@@ -50,14 +50,15 @@ struct CRL: PEMParseable, DERParseable {
 		var nodes1Iter = nodes1.makeIterator()
 		serialNumber = try Int64(derEncoded: &nodes1Iter)
 		_ = nodes1Iter.next() // skip signature
-		issuer = try DistinguishedName(derEncoded: &nodes1Iter)
+		guard let issuerNode = nodes1Iter.next() else { throw Self.toError(node: n1) }
+		issuer = try DistinguishedName(derEncoded: issuerNode)
 		validity = try SwiftASN1.UTCTime(derEncoded: &nodes1Iter)
 		subject = try SwiftASN1.UTCTime(derEncoded: &nodes1Iter)
 		guard let n2 = nodes1Iter.next() else { throw Self.toError(node: n1) } // subject public key info
 		guard case .constructed(let nodes3) = n2.content else { throw Self.toError(node: n2) }
 		revokedSerials = nodes3.compactMap { try? CRLSerialInfo(derEncoded: $0) }
 	}
-	
+
 	static func toError(node: SwiftASN1.ASN1Node) -> NSError {
 		NSError(domain: "CRL", code: 0, userInfo: [NSLocalizedDescriptionKey : "Invalid node \(node.identifier.description)"])
 	}

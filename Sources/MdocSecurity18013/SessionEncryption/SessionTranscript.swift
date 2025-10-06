@@ -28,7 +28,7 @@ public struct SessionTranscript: Sendable {
 	let eReaderRawData: [UInt8]?
 	// handover object
 	let handOver: CBOR
-		
+
 	public init(devEngRawData: [UInt8]? = nil, eReaderRawData: [UInt8]? = nil, handOver: CBOR) {
 		self.devEngRawData = devEngRawData
 		self.eReaderRawData = eReaderRawData
@@ -38,11 +38,11 @@ public struct SessionTranscript: Sendable {
 #if DEBUG
 // initializer used for tests only
 extension SessionTranscript: CBORDecodable {
-	public init?(cbor: CBOR) {
-		guard case let .array(arr) = cbor, arr.count == 3 else { return nil }
+	public init(cbor: CBOR) throws(MdocValidationError) {
+		guard case let .array(arr) = cbor, arr.count > 2 else { throw .invalidCbor("SessionTranscript must be an array") }
 		if let d = arr[0].decodeTaggedBytes() { devEngRawData = d } else { devEngRawData = nil }
-		if let e = arr[1].decodeTaggedBytes() { eReaderRawData = e; } else { eReaderRawData = nil }
-		handOver = arr[2]
+		if let e = arr[1].decodeTaggedBytes() { eReaderRawData = e } else { eReaderRawData = nil }
+		handOver = arr[2] // can be any CBOR value
 	}
 }
 #endif
