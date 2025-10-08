@@ -21,7 +21,7 @@ import SwiftCBOR
 import X509
 
 extension IssuerSigned {
-    public func validateMSO(docType: String, trustedIACA: [SecCertificate]) throws(MsoValidationError) {
+    public func validate(docType: String) throws(MsoValidationError) {
         // Perform validation logic here
         let msoValidationRules: [(MobileSecurityObject) -> [MsoValidationError]?] =
             [
@@ -30,7 +30,6 @@ extension IssuerSigned {
                 { validateDigestValues(mso: $0) },
                 { validateValidityInfo(mso: $0) },
                 { _ in validateMsoSignature() },
-                { _ in validateTrustedIACA(trustedIACA) }
             ]
         let errors: [MsoValidationError] = msoValidationRules.compactMap { $0(issuerAuth.mso) }.flatMap { $0 }
         if !errors.isEmpty {
@@ -92,16 +91,5 @@ extension IssuerSigned {
         return nil
     }
 
-    // Validate the issuer certificate against a list of trusted IACA certificates
-    func validateTrustedIACA(_ trustedIACA: [SecCertificate]) -> [MsoValidationError]? {
-        let secCerts = issuerAuth.x5chain.compactMap { SecCertificateCreateWithData(nil, Data($0) as CFData) }
-        guard secCerts.count > 0, secCerts.count == issuerAuth.x5chain.count else { return [.signatureVerificationFailed("Invalid issuer certificates in x5chain")] }
-        let b2 = SecurityHelpers.isMdocX5cValid(secCerts: secCerts, usage: .mdocAuth, rootCerts: trustedIACA)
-        if !b2.isValid {
-            let reasons = b2.validationMessages.joined(separator: "; ")
-            return [.issuerTrustFailed("Issuer certificate validation failed: \(reasons)")]
-        }
-        return nil
-    }
 
 }
