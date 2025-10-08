@@ -29,7 +29,7 @@ struct MsoValidationTests {
 		let dr = try DeviceResponse(data: [UInt8](base64Data))
 		let iss = try #require(dr.documents?.first?.issuerSigned)
         do {
-            try iss.validateMSO(docType: "eu.europa.ec.eudi.pid.1", trustedIACA: [])
+            try iss.validate(docType: "eu.europa.ec.eudi.pid.1")
         } catch {
             // Expected to fail due to missing/invalid certificates in x5chain
             switch error {
