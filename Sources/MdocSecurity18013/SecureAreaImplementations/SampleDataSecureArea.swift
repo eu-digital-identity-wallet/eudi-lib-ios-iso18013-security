@@ -35,7 +35,7 @@ public actor SampleDataSecureArea: SecureArea {
     public static var supportedEcCurves: [CoseEcCurve] { [.P256, .P384, .P521] }
     public func getStorage() async -> any MdocDataModel18013.SecureKeyStorage { storage }
 
-    public func createKeyBatch(id: String, keyOptions: KeyOptions?) async throws -> [CoseKey] {
+    public func createKeyBatch(id: String, credentialOptions: CredentialOptions, keyOptions: KeyOptions?) async throws -> [CoseKey] {
         let x963Priv: Data; let x963Pub: Data
         let curve = keyOptions?.curve ?? .P256
         switch curve {
