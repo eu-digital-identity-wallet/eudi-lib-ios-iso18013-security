@@ -41,7 +41,7 @@ public actor InMemoryP256SecureArea: SecureArea {
         return CoseKey(crv: .P256, x963Representation: key.publicKey.x963Representation)
     }
 
-    public func createKeyBatch(id: String, keyOptions: KeyOptions?) async throws -> [CoseKey] {
+    public func createKeyBatch(id: String, credentialOptions: CredentialOptions, keyOptions: KeyOptions?) async throws -> [CoseKey] {
         let res = try await createKey(id: id, index: 0, keyOptions: keyOptions)
         return [res]
     }

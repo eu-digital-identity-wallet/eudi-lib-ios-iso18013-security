@@ -35,7 +35,7 @@ public actor SoftwareSecureArea: SecureArea {
     nonisolated public static func create(storage: any MdocDataModel18013.SecureKeyStorage) -> SoftwareSecureArea {
         SoftwareSecureArea(storage: storage)
     }
-    
+
     public func createKeyMaterial(ecCurve: CoseEcCurve) throws -> (x963Priv: Data, x963Pub: Data) {
         switch ecCurve {
         case .P256: let key = P256.Signing.PrivateKey(compactRepresentable: false); return (key.x963Representation, key.publicKey.x963Representation)
@@ -44,10 +44,10 @@ public actor SoftwareSecureArea: SecureArea {
         default: throw SecureAreaError("Unsupported curve \(ecCurve)")
         }
     }
-    
-    public func createKeyBatch(id: String, keyOptions: KeyOptions?) async throws -> [CoseKey] {
+
+    public func createKeyBatch(id: String, credentialOptions: CredentialOptions, keyOptions: KeyOptions?) async throws -> [CoseKey] {
         let ecCurve = keyOptions?.curve ?? .P256
-        let batchSize = keyOptions?.batchSize ?? 1
+        let batchSize = credentialOptions.batchSize
         var res: [CoseKey] = []; res.reserveCapacity(batchSize)
         var dicts = [[String: Data]](); dicts.reserveCapacity(batchSize)
         for _ in 0..<batchSize {
@@ -55,12 +55,12 @@ public actor SoftwareSecureArea: SecureArea {
             dicts.append([kSecValueData as String: x963Priv])
             res.append(CoseKey(crv: ecCurve, x963Representation: x963Pub))
         }
-        let kbi = KeyBatchInfo(secureAreaName: Self.name, crv: ecCurve, usedCounts: Array(repeating: 0, count: batchSize), credentialPolicy: keyOptions?.credentialPolicy ?? .rotateUse)
+        let kbi = KeyBatchInfo(secureAreaName: Self.name, crv: ecCurve, usedCounts: Array(repeating: 0, count: batchSize), credentialPolicy: credentialOptions.credentialPolicy)
         try await storage.writeKeyInfo(id: id, dict: [kSecValueData as String: kbi.toData() ?? Data(), kSecAttrDescription as String: ecCurve.jwkName.data(using: .utf8)!])
         try await storage.writeKeyDataBatch(id: id, startIndex: 0, dicts: dicts, keyOptions: keyOptions)
         return res
     }
-    
+
     /// delete key
     public func deleteKeyBatch(id: String, startIndex: Int, batchSize: Int) async throws {
         try await storage.deleteKeyBatch(id: id, startIndex: startIndex, batchSize: batchSize)
