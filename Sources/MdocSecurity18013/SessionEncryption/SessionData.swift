@@ -22,10 +22,10 @@ import OrderedCollections
 
 /// Message data transfered between mDL and mDL reader
 public struct SessionData: Sendable {
-	
+
 	public let data: [UInt8]?
 	public let status: UInt64?
-	
+
 	enum CodingKeys: String, CodingKey {
 		case data
 		case status
@@ -38,8 +38,8 @@ public struct SessionData: Sendable {
 }
 
 extension SessionData: CBORDecodable {
-	public init?(cbor: CBOR) {
-		guard case let .map(values) = cbor else { logger.error("Session data must be a map"); return nil  }
+	public init(cbor: CBOR) throws(MdocValidationError) {
+		guard case let .map(values) = cbor else { throw .invalidCbor("SessionData must be a CBOR map") }
 		if case let .unsignedInt(s) = values[.utf8String(CodingKeys.status.rawValue)] { status = s } else { logger.info("SessionData: Missing status"); status = nil  }
 		if case let .byteString(bs) = values[.utf8String(CodingKeys.data.rawValue)] { data = bs } else { logger.error("SessionData: Missing data"); data = nil  }
 	}

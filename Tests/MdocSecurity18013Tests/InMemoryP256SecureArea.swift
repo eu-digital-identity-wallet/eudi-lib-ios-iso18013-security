@@ -21,7 +21,6 @@ import SwiftCBOR
 
 public actor InMemoryP256SecureArea: SecureArea {
 
-
     var storage: any MdocDataModel18013.SecureKeyStorage
     var key: P256.Signing.PrivateKey!
     public nonisolated(unsafe) var x963Key: Data?
@@ -32,6 +31,7 @@ public actor InMemoryP256SecureArea: SecureArea {
     nonisolated public static func create(storage: any MdocDataModel18013.SecureKeyStorage) -> InMemoryP256SecureArea {
         InMemoryP256SecureArea(storage: storage)
     }
+    public static var supportedEcCurves: [CoseEcCurve] { [.P256] }
 
     public func getStorage() async -> any MdocDataModel18013.SecureKeyStorage { storage }
 
@@ -41,7 +41,7 @@ public actor InMemoryP256SecureArea: SecureArea {
         return CoseKey(crv: .P256, x963Representation: key.publicKey.x963Representation)
     }
 
-    public func createKeyBatch(id: String, keyOptions: KeyOptions?) async throws -> [CoseKey] {
+    public func createKeyBatch(id: String, credentialOptions: CredentialOptions, keyOptions: KeyOptions?) async throws -> [CoseKey] {
         let res = try await createKey(id: id, index: 0, keyOptions: keyOptions)
         return [res]
     }
@@ -85,7 +85,7 @@ public actor DummySecureKeyStorage: MdocDataModel18013.SecureKeyStorage {
 extension MdocDataModel18013.CoseKeyPrivate {
   // decode cbor string
     public init?(p256data base64: String) {
-        guard let d = Data(base64Encoded: base64), let obj = try? CBOR.decode([UInt8](d)), let coseKey = CoseKey(cbor: obj), let cd = obj[-4], case let CBOR.byteString(rd) = cd else { return nil }
+        guard let d = Data(base64Encoded: base64), let obj = try? CBOR.decode([UInt8](d)), let coseKey = try? CoseKey(cbor: obj), let cd = obj[-4], case let CBOR.byteString(rd) = cd else { return nil }
         let sampleSA = InMemoryP256SecureArea(storage: DummySecureKeyStorage())
         let keyData = NSMutableData(bytes: [0x04], length: [0x04].count)
         keyData.append(Data(coseKey.x)); keyData.append(Data(coseKey.y)); keyData.append(Data(rd))

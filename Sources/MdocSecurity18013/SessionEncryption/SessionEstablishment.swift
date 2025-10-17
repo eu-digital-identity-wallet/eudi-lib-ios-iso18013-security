@@ -27,26 +27,32 @@ import OrderedCollections
 public struct SessionEstablishment: Sendable {
 	public var eReaderKeyRawData: [UInt8]?
 	public let data: [UInt8]
-	
+
 	enum CodingKeys: String, CodingKey {
 		case eReaderKey
 		case data
 	}
 	public var eReaderKey: CoseKey? {
 		if let eReaderKeyRawData {
-			return CoseKey(data: eReaderKeyRawData) } else { return nil }
+			do {
+				return try CoseKey(data: eReaderKeyRawData)
+			} catch {
+				logger.error("Failed to create CoseKey: \(error)")
+				return nil
+			}
+		} else { return nil }
 	}
 }
 
 extension SessionEstablishment: CBORDecodable {
-	public init?(cbor: CBOR) {
-		guard case let .map(m) = cbor else { logger.error("Session establishment data must be a map"); return nil  }
-		guard case let .byteString(bs) = m[.utf8String(CodingKeys.data.rawValue)] else { logger.error("Session establishment missing data"); return nil }
+	public init(cbor: CBOR) throws(MdocValidationError) {
+		guard case let .map(m) = cbor else { throw .invalidCbor("SessionEstablishment must be a CBOR map") }
+		guard case let .byteString(bs) = m[.utf8String(CodingKeys.data.rawValue)] else { throw .missingField("SessionEstablishment", CodingKeys.data.rawValue) }
 		data = bs
 		if let eReaderKey = m[.utf8String(CodingKeys.eReaderKey.rawValue)] {
-			guard case let .tagged(tag, value) = eReaderKey else { logger.error("Session establishment eReaderKey must be tagged"); return nil }
-			guard tag == .encodedCBORDataItem else { logger.error("Session establishment eReaderKey tag must be encodedCBOR (24)"); return nil }
-			guard case let .byteString(ebs) = value else { logger.error("eReaderKey value must be byteString"); return nil }
+			guard case let .tagged(tag, value) = eReaderKey else { throw .invalidCbor("SessionEstablishment eReaderKey must be tagged") }
+			guard tag == .encodedCBORDataItem else { throw .invalidCbor("SessionEstablishment eReaderKey tag must be encodedCBOR (24)") }
+			guard case let .byteString(ebs) = value else { throw .invalidCbor("SessionEstablishment eReaderKey value must be byteString") }
 			eReaderKeyRawData = ebs
 		} else { eReaderKeyRawData = nil }
 	}

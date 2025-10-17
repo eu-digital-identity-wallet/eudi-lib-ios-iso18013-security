@@ -32,12 +32,12 @@ public actor SampleDataSecureArea: SecureArea {
     nonisolated public static func create(storage: any MdocDataModel18013.SecureKeyStorage) -> SampleDataSecureArea {
         SampleDataSecureArea(storage: storage)
     }
+    public static var supportedEcCurves: [CoseEcCurve] { [.P256, .P384, .P521] }
     public func getStorage() async -> any MdocDataModel18013.SecureKeyStorage { storage }
-    
-    public func createKeyBatch(id: String, keyOptions: KeyOptions?) async throws -> [CoseKey] {
+
+    public func createKeyBatch(id: String, credentialOptions: CredentialOptions, keyOptions: KeyOptions?) async throws -> [CoseKey] {
         let x963Priv: Data; let x963Pub: Data
         let curve = keyOptions?.curve ?? .P256
-        let batchSize = keyOptions?.batchSize ?? 1
         switch curve {
         case .P256:
             let key = if let x963Key { try P256.Signing.PrivateKey(x963Representation: x963Key) } else { P256.Signing.PrivateKey() }
@@ -50,13 +50,12 @@ public actor SampleDataSecureArea: SecureArea {
             x963Priv = key.x963Representation; x963Pub = key.publicKey.x963Representation
         default: throw SecureAreaError("Unsupported curve \(curve)")
         }
-        let batchSizeData = withUnsafeBytes(of: batchSize.littleEndian) { Data($0) }
         let kbi = KeyBatchInfo(secureAreaName: Self.name, crv: curve, usedCounts: [0], credentialPolicy: .rotateUse)
         try await storage.writeKeyInfo(id: id, dict: [kSecValueData as String: kbi.toData() ?? Data(), kSecAttrDescription as String: curve.jwkName.data(using: .utf8)!])
         try await storage.writeKeyDataBatch(id: id, startIndex: 0, dicts: [[kSecValueData as String: x963Priv]], keyOptions: keyOptions)
         return [CoseKey(crv: curve, x963Representation: x963Pub)]
     }
-    
+
     /// delete key
     public func deleteKeyBatch(id: String, startIndex: Int, batchSize: Int) async throws {
         try await storage.deleteKeyBatch(id: id, startIndex: startIndex, batchSize: batchSize)
