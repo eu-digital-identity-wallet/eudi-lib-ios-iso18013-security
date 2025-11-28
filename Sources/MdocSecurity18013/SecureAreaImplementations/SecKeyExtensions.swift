@@ -98,19 +98,26 @@ extension SecKey {
             }
         }
     }
+    
+    public static func getExistingKey(type: KeyType, keyId: String) -> SecKey? {
+        let tag = keyId.data(using: .utf8)!
+        let getQuery: [String: Any] = [kSecClass as String: kSecClassKey, kSecAttrApplicationTag as String: tag, kSecAttrKeyType as String: type.secAttrKeyTypeValue, kSecReturnRef as String: true]
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(getQuery as CFDictionary, &item)
+        guard status == errSecSuccess else { return nil }
+        return (item as! SecKey)
+    }
 
-    /// Creates a random key.
+    /// Creates a random key. if keyId is passed the key is saved
     /// Elliptic curve bits options are: 192, 256, 384, or 521.
-    public static func createRandomKey(type: KeyType, bits: Int) throws -> SecKey {
+    public static func createRandomKey(type: KeyType, bits: Int, keyId: String? = nil) throws -> SecKey {
+        var attributes: [String: Any] = [kSecAttrKeyType as String: type.secAttrKeyTypeValue, kSecAttrKeyClass as String: kSecAttrKeyClassPrivate, kSecAttrKeySizeInBits as String: NSNumber(integerLiteral: bits)]
+        if let keyId {
+            let tag = keyId.data(using: .utf8)!
+            attributes[kSecPrivateKeyAttrs as String] = [kSecAttrIsPermanent as String: true, kSecAttrApplicationTag as String: tag]
+        }
         var error: Unmanaged<CFError>?
-        let keyO = SecKeyCreateRandomKey([
-            kSecAttrKeyType: type.secAttrKeyTypeValue,
-            kSecAttrKeyClass: kSecAttrKeyClassPrivate,
-            kSecAttrKeySizeInBits: NSNumber(integerLiteral: bits),
-        ] as CFDictionary, &error)
-        // https://developer.apple.com/documentation/security/certificate_key_and_trust_services/keys/storing_keys_as_data
-        if let error = error?.takeRetainedValue() { throw error }
-        guard let key = keyO else { throw NSError(domain: "SecKey", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create random key"]) }
+        guard let key = SecKeyCreateRandomKey(attributes as CFDictionary, &error) else { throw error!.takeRetainedValue() as Error }
         return key
     }
 

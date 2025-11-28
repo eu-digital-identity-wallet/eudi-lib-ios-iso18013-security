@@ -60,7 +60,22 @@ public actor SoftwareSecureArea: SecureArea {
         try await storage.writeKeyDataBatch(id: id, startIndex: 0, dicts: dicts, keyOptions: keyOptions)
         return res
     }
-
+    
+    public func getPublicKey(id: String, index: Int, curve: CoseEcCurve) async throws -> CoseKey {
+        let x963Priv = try await getKeyData(id: id, index: index)
+        switch curve {
+        case .P256:
+            let privKey = try P256.Signing.PrivateKey(x963Representation: x963Priv)
+            return CoseKey(crv: .P256, x963Representation: privKey.publicKey.x963Representation)
+        case .P384:
+            let privKey = try P384.Signing.PrivateKey(x963Representation: x963Priv)
+            return CoseKey(crv: .P384, x963Representation: privKey.publicKey.x963Representation)
+        case .P521:
+            let privKey = try P521.Signing.PrivateKey(x963Representation: x963Priv)
+            return CoseKey(crv: .P521, x963Representation: privKey.publicKey.x963Representation)
+        default: throw SecureAreaError("Unsupported curve \(curve)")
+       }
+    }
     /// delete key
     public func deleteKeyBatch(id: String, startIndex: Int, batchSize: Int) async throws {
         try await storage.deleteKeyBatch(id: id, startIndex: startIndex, batchSize: batchSize)

@@ -45,6 +45,10 @@ public actor InMemoryP256SecureArea: SecureArea {
         let res = try await createKey(id: id, index: 0, keyOptions: keyOptions)
         return [res]
     }
+    
+    public func getPublicKey(id: String, index: Int, curve: CoseEcCurve) async throws -> CoseKey {
+        return CoseKey(crv: .P256, x963Representation: key.publicKey.x963Representation)
+    }
 
     public func deleteKeyBatch(id: String, startIndex: Int, batchSize: Int) throws { }
 
