@@ -55,6 +55,11 @@ public actor SampleDataSecureArea: SecureArea {
         try await storage.writeKeyDataBatch(id: id, startIndex: 0, dicts: [[kSecValueData as String: x963Priv]], keyOptions: keyOptions)
         return [CoseKey(crv: curve, x963Representation: x963Pub)]
     }
+    
+    public func getPublicKey(id: String, index: Int, curve: CoseEcCurve) async throws -> CoseKey {
+        let softwareSA = SoftwareSecureArea(storage: storage)
+        return try await softwareSA.getPublicKey(id: id, index: index, curve: curve)
+    }
 
     /// delete key
     public func deleteKeyBatch(id: String, startIndex: Int, batchSize: Int) async throws {
