@@ -58,7 +58,7 @@ public class SecurityHelpers {
 		guard let x509cert = try? X509.Certificate(derEncoded: [UInt8](secData)) else { return (false,["Not valid certificate for \(usage)"], nil) }
 		guard x509cert.notValidBefore <= now, now <= x509cert.notValidAfter else { return (false, ["Current date not in validity period of Certificate: \(x509cert.notValidBefore.formatted()) - \(x509cert.notValidAfter.formatted())"], nil) }
 		let valDays = Calendar.current.dateComponents([.day], from: x509cert.notValidBefore, to: x509cert.notValidAfter).day
-		guard let valDays, valDays > 0 else { return (false, ["Invalid validity period"], nil) }
+		guard let valDays, valDays >= 0 else { return (false, ["Invalid validity period"], nil) }
 		guard !x509cert.subject.isEmpty, let cn = getCommonName(ref: secCert), !cn.isEmpty else { return (false, ["Missing Common Name of Reader Certificate"], nil) }
 		guard !x509cert.signature.description.isEmpty else { return (false, ["Missing Signature data"], nil) }
 		if x509cert.serialNumber.description.isEmpty { messages.append("Missing Serial number") }
