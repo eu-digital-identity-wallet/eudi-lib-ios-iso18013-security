@@ -33,6 +33,8 @@ public enum NotAllowedExtension: String, CaseIterable, Sendable {
 	case freshestCRL = "2.5.29.46"
 }
 
+public typealias x5chain = [SecCertificate]
+
 public class SecurityHelpers {
 	public static let nonAllowedExtensions: [String] = NotAllowedExtension.allCases.map(\.rawValue)
 
@@ -48,7 +50,7 @@ public class SecurityHelpers {
 		return repr as Data
 	}
 
-	public static func isMdocX5cValid(secCerts: [SecCertificate], usage: CertificateUsage, rootCerts: [SecCertificate]) -> (isValid:Bool, validationMessages: [String], rootCert: SecCertificate?) {
+	public static func isMdocX5cValid(secCerts: [SecCertificate], usage: CertificateUsage, rootIaca: [x5chain]) -> (isValid:Bool, validationMessages: [String], rootCert: SecCertificate?) {
 		let now = Date(); var messages = [String]()
 		var trust: SecTrust?; let policy = SecPolicyCreateBasicX509(); _ = SecTrustCreateWithCertificates(secCerts as CFArray, policy, &trust)
 		guard let trust else { return (false, ["Not valid certificate for \(usage)"], nil) }
@@ -69,9 +71,9 @@ public class SecurityHelpers {
 			if let gns = x509cert.getSubjectAlternativeNames(), let gn = gns.first(where: { switch $0 { case .rfc822Name(_): true; case .uniformResourceIdentifier(_): true;  default: false } }) { logger.info("Alternative name \(gn.description)")}
 		}
 		SecTrustSetPolicies(trust, policy)
-		for rootCert in rootCerts {
-			let certArray = [rootCert]
-			SecTrustSetAnchorCertificates(trust, certArray as CFArray)
+		for rootChain in rootIaca {
+			guard let rootCert = rootChain.first else { continue }
+			SecTrustSetAnchorCertificates(trust, rootChain as CFArray)
 			SecTrustSetAnchorCertificatesOnly(trust, true)
 			let serverTrustIsValid = trustIsValid(trust)
 			if serverTrustIsValid {
