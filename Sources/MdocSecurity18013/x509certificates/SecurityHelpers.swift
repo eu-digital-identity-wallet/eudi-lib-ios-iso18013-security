@@ -50,7 +50,7 @@ public class SecurityHelpers {
 		return repr as Data
 	}
 
-	public static func isMdocX5cValid(secCerts: [SecCertificate], usage: CertificateUsage, rootIaca: [x5chain]) -> (isValid:Bool, validationMessages: [String], rootCert: SecCertificate?) {
+	public static func isMdocX5cValid(secCerts: x5chain, usage: CertificateUsage, rootIaca: [x5chain]) -> (isValid:Bool, validationMessages: [String], rootCert: SecCertificate?) {
 		let now = Date(); var messages = [String]()
 		var trust: SecTrust?; let policy = SecPolicyCreateBasicX509(); _ = SecTrustCreateWithCertificates(secCerts as CFArray, policy, &trust)
 		guard let trust else { return (false, ["Not valid certificate for \(usage)"], nil) }
@@ -72,7 +72,7 @@ public class SecurityHelpers {
 		}
 		SecTrustSetPolicies(trust, policy)
 		for rootChain in rootIaca {
-			guard let rootCert = rootChain.first else { continue }
+			guard let rootCert = rootChain.last else { continue }
 			SecTrustSetAnchorCertificates(trust, rootChain as CFArray)
 			SecTrustSetAnchorCertificatesOnly(trust, true)
 			let serverTrustIsValid = trustIsValid(trust)
