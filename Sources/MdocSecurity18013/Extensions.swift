@@ -15,9 +15,18 @@ limitations under the License.
 */
 
 import Foundation
+import Security
 import SwiftASN1
 import X509
 //import ASN1Decoder
+
+extension SecCertificate {
+	/// Converts this `SecCertificate` to a swift-certificates `X509.Certificate`.
+	public func certificate() throws -> X509.Certificate {
+		let derData = SecCertificateCopyData(self) as Data
+		return try X509.Certificate(derEncoded: [UInt8](derData))
+	}
+}
 
 extension UInt32 {
   public var data: Data {
@@ -50,6 +59,15 @@ extension X509.Certificate {
 	func getSubjectAlternativeNames() -> [GeneralName]? {
 		guard let sa = try? extensions.subjectAlternativeNames, sa.count > 0 else { return nil }
 		return Array(sa)
+	}
+
+	func getIssuerAlternativeNames() -> [GeneralName]? {
+		// Issuer Alternative Name OID: 2.5.29.18
+		guard let ext = extensions[oid: ASN1ObjectIdentifier(arrayLiteral: 2, 5, 29, 18)] else { return nil }
+		guard let rootNode = try? DER.parse(ext.value),
+			  let generalNames = try? DER.sequence(of: GeneralName.self, identifier: .sequence, rootNode: rootNode),
+			  !generalNames.isEmpty else { return nil }
+		return generalNames
 	}
 	
 	func hasDuplicateExtensions() -> Bool {

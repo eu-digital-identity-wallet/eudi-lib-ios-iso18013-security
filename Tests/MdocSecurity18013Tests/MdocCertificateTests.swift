@@ -26,7 +26,7 @@ struct CertificateHandlingTests {
     var multipazIaca: x5chain
 
     init() throws {
-        let pemStr = try String(contentsOf: Bundle.module.url(forResource: "org_multipaz_readerRootCert", withExtension: "pem.txt")!)
+        let pemStr = try String(contentsOf: Bundle.module.url(forResource: "org_multipaz_readerRootCert", withExtension: "pem")!)
         // Split PEM string into individual certificate blocks
         let pemBlocks = pemStr.components(separatedBy: "-----END CERTIFICATE-----")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -104,45 +104,30 @@ struct CertificateHandlingTests {
 		print("Messages:", messages)
 	}
 
-	@Test("isMdocX5cValid with PEM leaf and root IACA chain", arguments: [
+	@Test("isMdocX5cValid with multipaz reader and multipaz root IACA chain", arguments: [
 		// Each tuple: (leafPEMs: [String], rootIacaPEMs: [[String]], usage, expectedValid)
 		// Test case: empty leaf array
 		X5cValidationTestCase(
-			name: "Empty leaf certs",
-			leafPEMs: [],
-			rootIacaPEMs: [],
-			usage: .mdocReaderAuth,
-			expectedValid: false
+			name: "Multipaz reader certs",
+			leafPEMs: ["MIIB0zCCAXqgAwIBAgIBATAKBggqhkjOPQQDAjA0MTIwMAYDVQQDDClWZXJpZmllciBhdCBodHRwczovL3ZlcmlmaWVyLm11bHRpcGF6Lm9yZzAeFw0yNjAzMDMxNzEzMThaFw0yNjAzMDMxNzMzMThaMD0xOzA5BgNVBAMMMk9XRiBNdWx0aXBheiBPbmxpbmUgVmVyaWZpZXIgU2luZ2xlLVVzZSBSZWFkZXIgS2V5MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0acAEkQeMRf6rX8FfMKKBmQMVJ8rGMJDFo24ed8Jw+S2o/8wKIKrE4gfWR+fmOAhKepEmmfNZlN9rlvEnMejQKN0MHIwHwYDVR0jBBgwFoAUKY8Mq2l+ofgYwkKZT5IU7fMHS0kwDgYDVR0PAQH/BAQDAgeAMCAGA1UdEQQZMBeCFXZlcmlmaWVyLm11bHRpcGF6Lm9yZzAdBgNVHQ4EFgQUUEHBkW8mIX2SvNSZZCvrjpaH3a8wCgYIKoZIzj0EAwIDRwAwRAIgOkbm25MR71jXH/ZPxupK7dpMOhbKjRzeek1+BIvRZ5sCIC3/VqZoe03CuRU4pbF70QFAta3XeRI9X/u7anrMqRLL", "MIICgjCCAgigAwIBAgINDLYtfihtRKwfEIsMmjAKBggqhkjOPQQDAzBMMT0wOwYDVQQDDDRWZXJpZmllciBSb290IGF0IGh0dHBzOi8vaXNzdWVyLm11bHRpcGF6Lm9yZy9yZWNvcmRzMQswCQYDVQQGDAJVUzAeFw0yNjAxMDUxNjM0MzJaFw0yNjA3MDcxNjM0MzJaMDQxMjAwBgNVBAMMKVZlcmlmaWVyIGF0IGh0dHBzOi8vdmVyaWZpZXIubXVsdGlwYXoub3JnMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEFxs/o7ohOy5azsnoUCcg7S4KEq3STHJ2csg0Ik7qAz9pZCVSp0Yl/Tio24wujDpLJgtaMJaiSRO2r7aPmrV7AKOB5jCB4zAfBgNVHSMEGDAWgBSR13i/vr4VbyW9Jcon4j/PQP4kJTAOBgNVHQ8BAf8EBAMCAgQwLgYDVR0SBCcwJYYjaHR0cHM6Ly9pc3N1ZXIubXVsdGlwYXoub3JnL3JlY29yZHMwQQYDVR0fBDowODA2oDSgMoYwaHR0cHM6Ly9pc3N1ZXIubXVsdGlwYXoub3JnL3JlY29yZHMvY3JsL3ZlcmlmaWVyMB4GA1UdJQEB/wQUMBIGByiBjF0FAQYGByiBtTQEAQYwHQYDVR0OBBYEFCmPDKtpfqH4GMJCmU+SFO3zB0tJMAoGCCqGSM49BAMDA2gAMGUCMQC7fsZi+ee8+166MXcw8jp/w1/F3uS6QfUSZcMlHxxP6UB0ufWjdhZ3s/TD5HpsZIkCMGImWURFegV2x8TZjnaCoHFMf1jrri9C0Eem7be5o3rjKGtjEkU9R6MfpSom00LWcw=="],
+			usage: .mdocReaderAuth, expectedValid: false
 		),
 	])
 	func isMdocX5cValidParameterized(testCase: X5cValidationTestCase) throws {
 		let leafCerts = testCase.leafPEMs.compactMap { Self.secCertificate(fromPEM: $0) }
-		let rootIaca: [x5chain] = testCase.rootIacaPEMs.map { chain in
-			chain.compactMap { Self.secCertificate(fromPEM: $0) }
-		}
 		let (isValid, messages, _) = SecurityHelpers.isMdocX5cValid(
-			secCerts: leafCerts,
-			usage: testCase.usage,
-			rootIaca: rootIaca
-		)
+			secCerts: leafCerts, usage: testCase.usage, rootIaca: [multipazIaca])
 		#expect(isValid == testCase.expectedValid, "Test '\(testCase.name)' expected isValid=\(testCase.expectedValid), got \(isValid). Messages: \(messages)")
 		print("Test '\(testCase.name)' messages:", messages)
 	}
 
-	/// Convert DER data to a PEM string (for reusing the bundled DER cert in PEM form)
-	private func pemFromDERData(_ data: Data) -> String {
-		let base64 = data.base64EncodedString(options: [.lineLength64Characters, .endLineWithLineFeed])
-		return "-----BEGIN CERTIFICATE-----\n\(base64)\n-----END CERTIFICATE-----"
-	}
 }
 
 /// Test case for parameterized isMdocX5cValid tests
 struct X5cValidationTestCase: Sendable, CustomTestStringConvertible {
 	let name: String
 	let leafPEMs: [String]
-	let rootIacaPEMs: [[String]]
 	let usage: CertificateUsage
 	let expectedValid: Bool
-
 	var testDescription: String { name }
 }

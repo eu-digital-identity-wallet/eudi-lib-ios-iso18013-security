@@ -51,13 +51,14 @@ public class SecurityHelpers {
 	}
 
 	public static func isMdocX5cValid(secCerts: x5chain, usage: CertificateUsage, rootIaca: [x5chain]) -> (isValid:Bool, validationMessages: [String], rootCert: SecCertificate?) {
+		guard let secCert = secCerts.first else { return (false, ["Certificate not found"], nil) }
+		// convert to swift-certificates object
+		guard let x509cert = try? secCert.certificate() else { return (false,["Not valid certificate for \(usage)"], nil) }
+		let basicConstraints = try? x509cert.extensions.basicConstraints
+		if basicConstraints != nil { logger.info("Basic constraints: \(basicConstraints!)") }
 		let now = Date(); var messages = [String]()
 		var trust: SecTrust?; let policy = SecPolicyCreateBasicX509(); _ = SecTrustCreateWithCertificates(secCerts as CFArray, policy, &trust)
 		guard let trust else { return (false, ["Not valid certificate for \(usage)"], nil) }
-		// convert to swift-certificates object
-		guard let secCert = secCerts.first else { return (false, ["Certificate not found"], nil) }
-		let secData: Data = SecCertificateCopyData(secCert) as Data
-		guard let x509cert = try? X509.Certificate(derEncoded: [UInt8](secData)) else { return (false,["Not valid certificate for \(usage)"], nil) }
 		guard x509cert.notValidBefore <= now, now <= x509cert.notValidAfter else { return (false, ["Current date not in validity period of Certificate: \(x509cert.notValidBefore.formatted()) - \(x509cert.notValidAfter.formatted())"], nil) }
 		let valDays = Calendar.current.dateComponents([.day], from: x509cert.notValidBefore, to: x509cert.notValidAfter).day
 		guard let valDays, valDays >= 0 else { return (false, ["Invalid validity period"], nil) }
@@ -75,9 +76,10 @@ public class SecurityHelpers {
 			guard let rootCert = rootChain.last else { continue }
 			SecTrustSetAnchorCertificates(trust, rootChain as CFArray)
 			SecTrustSetAnchorCertificatesOnly(trust, true)
-			let serverTrustIsValid = trustIsValid(trust)
+			let (serverTrustIsValid, errorMessage, errorCode) = trustIsValid(trust)
+			if let errorMessage { messages.append("Trust evaluation error: \(errorMessage) (code: \(errorCode ?? -1))") }
 			if serverTrustIsValid {
-				guard let x509root = try? X509.Certificate(derEncoded: [UInt8](SecCertificateCopyData(rootCert) as Data)) else { return (false, ["Bad root certificate"], rootCert) }
+				guard let x509root = try? rootCert.certificate() else { return (false, ["Bad root certificate"], rootCert) }
 				guard x509root.notValidBefore <= now, now <= x509root.notValidAfter else { return (false, ["Current date not in validity period of Reader Root Certificate"], nil) }
 				if usage == .mdocReaderAuth, let rootGns = x509root.getSubjectAlternativeNames(), let gns = x509cert.getSubjectAlternativeNames() {
 					guard gns.elementsEqual(rootGns) else { return (false, ["Issuer data rfc822Name or uniformResourceIdentifier do not match with root cert."], nil) }
@@ -94,14 +96,50 @@ public class SecurityHelpers {
 		return (false, messages, nil)
 	}
 
-	public static func trustIsValid(_ trust: SecTrust) -> Bool {
+	public static func trustIsValid(_ trust: SecTrust) -> (Bool, String?, Int?) {
 		var error: CFError?
 		let isValid = SecTrustEvaluateWithError(trust, &error)
-		if let error { logger.error("Error evaluating trust: \(error)") }
-		return isValid
+		//if let error { logger.error("Error evaluating trust: \(error)") }
+        return (isValid, error?.localizedDescription, (error as? NSError)?.code)
 	}
+    
+    public static func isChainFound(secCerts: x5chain, rootIaca: [x5chain]) async -> (isValid: Bool, validationMessages: [String], rootCert: SecCertificate?) {
+        guard let leafSecCert = secCerts.first, let leafCert = try? leafSecCert.certificate() else {
+            return (false, ["Certificate not found"], nil)
+        }
+        let intermediateCerts: [Certificate] = secCerts.dropFirst().compactMap { try? $0.certificate() }
+        for rootChain in rootIaca {
+            guard let rootSecCert = rootChain.last else { continue }
+            let rootCerts = rootChain.compactMap { try? $0.certificate() }
+            guard !rootCerts.isEmpty else { continue }
+            let (isValid, messages) = await verifyChain(rootCertificates: rootCerts, intermediateCertificates: intermediateCerts, leafCertificate: leafCert)
+            if isValid { return (true, messages, rootSecCert) }
+        }
+        return (false, ["Certificate chain not matched with root certificates"], nil)
+    }
 
-	public static func fetchCRLSerialNumbers(_ x509root: X509.Certificate) -> [Certificate.SerialNumber] {
+	public static func verifyChain(rootCertificates: [Certificate], intermediateCertificates: [Certificate] = [], leafCertificate: Certificate) async -> (Bool, [String]) {
+    let roots = CertificateStore(rootCertificates)
+    var verifier = Verifier(rootCertificates: roots) {
+      AnyPolicy {
+        RFC5280Policy()
+      }
+    }
+
+    let result = await verifier.validate(
+      leaf: leafCertificate,
+      intermediates: CertificateStore(intermediateCertificates)) { diagnostic in
+    }
+
+    switch result {
+    case .validCertificate:
+      return (true, [])
+    case .couldNotValidate(let policyFailures):
+      return (false, policyFailures.map { $0.policyFailureReason.description })
+    }
+  }
+
+ public static func fetchCRLSerialNumbers(_ x509root: X509.Certificate) -> [Certificate.SerialNumber] {
 		var res = [Certificate.SerialNumber]()
 		if let ext = x509root.extensions[oid: .X509ExtensionID.cRLDistributionPoints], let crlDistr = try? CRLDistributions(derEncoded: ext.value) {
 			for crl in crlDistr.crls {
@@ -118,12 +156,12 @@ public class SecurityHelpers {
 		// check issuer
 		if !x509.issuer.isEmpty { logger.info("Issuer \(x509.issuer.description)")} else { messages.append("Missing Issuer") }
 		// check authority key identifier
-		if let ext_aki = try? x509.extensions.authorityKeyIdentifier, let ext_aki_ki = ext_aki.keyIdentifier, !ext_aki_ki.isEmpty { logger.info("Authority key identifier \(ext_aki_ki.description)") } else { messages.append("Missing Authority Key Identifier") }
+		if let ext_aki = try? x509.extensions.authorityKeyIdentifier, let ext_aki_ki = ext_aki.keyIdentifier, !ext_aki_ki.isEmpty { logger.notice("Authority key identifier \(ext_aki_ki.description)") } else { messages.append("Missing Authority Key Identifier") }
 		// check subject key identifier
 		let pk_data = Array(x509.publicKey.subjectPublicKeyInfoBytes)
 		let ext_ski = try? x509.extensions.subjectKeyIdentifier
 		if let ext_ski {
-			logger.info("Subject key Identifier \(ext_ski.keyIdentifier.description)")
+			logger.notice("Subject key Identifier \(ext_ski.keyIdentifier.description)")
 			let ski = Array(ext_ski.keyIdentifier)
 			if ski == Array(Insecure.SHA1.hash(data: pk_data)) { logger.info("Subject Key Identifier equal to public key SHA1") } else { messages.append("Wrong Subject Key Identifier") }
 		} else { messages.append("Missing Subject Key Identifier") }
