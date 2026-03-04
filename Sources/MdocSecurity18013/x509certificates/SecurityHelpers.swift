@@ -54,8 +54,6 @@ public class SecurityHelpers {
 		guard let secCert = secCerts.first else { return (false, ["Certificate not found"], nil) }
 		// convert to swift-certificates object
 		guard let x509cert = try? secCert.certificate() else { return (false,["Not valid certificate for \(usage)"], nil) }
-		let basicConstraints = try? x509cert.extensions.basicConstraints
-		if basicConstraints != nil { logger.info("Basic constraints: \(basicConstraints!)") }
 		let now = Date(); var messages = [String]()
 		var trust: SecTrust?; let policy = SecPolicyCreateBasicX509(); _ = SecTrustCreateWithCertificates(secCerts as CFArray, policy, &trust)
 		guard let trust else { return (false, ["Not valid certificate for \(usage)"], nil) }
@@ -125,12 +123,10 @@ public class SecurityHelpers {
         RFC5280Policy()
       }
     }
-
     let result = await verifier.validate(
       leaf: leafCertificate,
       intermediates: CertificateStore(intermediateCertificates)) { diagnostic in
     }
-
     switch result {
     case .validCertificate:
       return (true, [])

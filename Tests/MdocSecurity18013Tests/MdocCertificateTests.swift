@@ -23,40 +23,12 @@ import Security
 
 @Suite("Certificate Handling Tests")
 struct CertificateHandlingTests {
-    var multipazIaca: x5chain
+    var eudiIaca: x5chain
 
     init() throws {
-        let pemStr = try String(contentsOf: Bundle.module.url(forResource: "org_multipaz_readerRootCert", withExtension: "pem")!)
-        // Split PEM string into individual certificate blocks
-        let pemBlocks = pemStr.components(separatedBy: "-----END CERTIFICATE-----")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        multipazIaca = try pemBlocks.map { block in
-            let lines = block.components(separatedBy: .newlines)
-                .map { $0.trimmingCharacters(in: .whitespaces) }
-                .filter { !$0.hasPrefix("-----") && !$0.isEmpty }
-            let base64String = lines.joined()
-            let derData = try #require(Data(base64Encoded: base64String))
-            return try #require(SecCertificateCreateWithData(nil, derData as CFData))
-        }
-        #expect(multipazIaca.count == 2)
-        for (i, cert) in multipazIaca.enumerated() {
-            let certObj = try X509.Certificate(derEncoded: [UInt8](SecCertificateCopyData(cert) as Data))
-            print("Certificate \(i + 1) subject:", certObj.subject.description)
-        }
+        let derData = try Data(contentsOf: Bundle.module.url(forResource: "pidissuerca02_ut", withExtension: "der")!)
+		eudiIaca = [try #require(SecCertificateCreateWithData(nil, derData as CFData))]
     }
-
-	@Test("Reader certificate validations")
-	func readerCertificateValidations() throws {
-		let cert = try #require(multipazIaca.first)
-		let certData = SecCertificateCopyData(cert) as Data
-		let certObj = try X509.Certificate(derEncoded: [UInt8](certData))
-		print("Certificate subject:", certObj.subject.description)
-		let (isValid, messages, _) = SecurityHelpers.isMdocX5cValid(
-			secCerts: [cert], usage: .mdocReaderAuth, rootIaca: [multipazIaca])
-		#expect(isValid)
-		print("Validation messages", messages)
-	}
 
 	@Test("CRL parsing")
 	func crlParsing() throws {
@@ -85,7 +57,7 @@ struct CertificateHandlingTests {
 
 	@Test("isMdocX5cValid fails with no root IACA certificates")
 	func isMdocX5cValidNoRoots() throws {
-		let leafCert = try #require(multipazIaca.first)
+		let leafCert = try #require(eudiIaca.first)
 		let (isValid, messages, rootCert) = SecurityHelpers.isMdocX5cValid(
 			secCerts: [leafCert], usage: .mdocReaderAuth, rootIaca: [])
 		#expect(!isValid)
@@ -96,32 +68,33 @@ struct CertificateHandlingTests {
 
 	@Test("isMdocX5cValid succeeds with self-signed root IACA certificate")
 	func isMdocX5cValidSelfSignedRoot() throws {
-		let leafCert = try #require(multipazIaca.first)
+		let leafCert = try #require(eudiIaca.first)
 		// Use the same cert as a "root" — it is self-signed
-		let (isValid, messages, _) = SecurityHelpers.isMdocX5cValid(secCerts: [leafCert], usage: .mdocReaderAuth, rootIaca: [multipazIaca])
+		let (isValid, messages, _) = SecurityHelpers.isMdocX5cValid(secCerts: [leafCert], usage: .mdocReaderAuth, rootIaca: [eudiIaca])
 		// The cert is self signed
 		#expect(isValid)
 		print("Messages:", messages)
 	}
 
-	@Test("isMdocX5cValid with multipaz reader and multipaz root IACA chain", arguments: [
+	@Test("isMdocX5cValid with eudi reader and eudi root IACA chain", arguments: [
 		// Each tuple: (leafPEMs: [String], rootIacaPEMs: [[String]], usage, expectedValid)
 		// Test case: empty leaf array
 		X5cValidationTestCase(
-			name: "Multipaz reader certs",
-			leafPEMs: ["MIIB0zCCAXqgAwIBAgIBATAKBggqhkjOPQQDAjA0MTIwMAYDVQQDDClWZXJpZmllciBhdCBodHRwczovL3ZlcmlmaWVyLm11bHRpcGF6Lm9yZzAeFw0yNjAzMDMxNzEzMThaFw0yNjAzMDMxNzMzMThaMD0xOzA5BgNVBAMMMk9XRiBNdWx0aXBheiBPbmxpbmUgVmVyaWZpZXIgU2luZ2xlLVVzZSBSZWFkZXIgS2V5MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0acAEkQeMRf6rX8FfMKKBmQMVJ8rGMJDFo24ed8Jw+S2o/8wKIKrE4gfWR+fmOAhKepEmmfNZlN9rlvEnMejQKN0MHIwHwYDVR0jBBgwFoAUKY8Mq2l+ofgYwkKZT5IU7fMHS0kwDgYDVR0PAQH/BAQDAgeAMCAGA1UdEQQZMBeCFXZlcmlmaWVyLm11bHRpcGF6Lm9yZzAdBgNVHQ4EFgQUUEHBkW8mIX2SvNSZZCvrjpaH3a8wCgYIKoZIzj0EAwIDRwAwRAIgOkbm25MR71jXH/ZPxupK7dpMOhbKjRzeek1+BIvRZ5sCIC3/VqZoe03CuRU4pbF70QFAta3XeRI9X/u7anrMqRLL", "MIICgjCCAgigAwIBAgINDLYtfihtRKwfEIsMmjAKBggqhkjOPQQDAzBMMT0wOwYDVQQDDDRWZXJpZmllciBSb290IGF0IGh0dHBzOi8vaXNzdWVyLm11bHRpcGF6Lm9yZy9yZWNvcmRzMQswCQYDVQQGDAJVUzAeFw0yNjAxMDUxNjM0MzJaFw0yNjA3MDcxNjM0MzJaMDQxMjAwBgNVBAMMKVZlcmlmaWVyIGF0IGh0dHBzOi8vdmVyaWZpZXIubXVsdGlwYXoub3JnMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEFxs/o7ohOy5azsnoUCcg7S4KEq3STHJ2csg0Ik7qAz9pZCVSp0Yl/Tio24wujDpLJgtaMJaiSRO2r7aPmrV7AKOB5jCB4zAfBgNVHSMEGDAWgBSR13i/vr4VbyW9Jcon4j/PQP4kJTAOBgNVHQ8BAf8EBAMCAgQwLgYDVR0SBCcwJYYjaHR0cHM6Ly9pc3N1ZXIubXVsdGlwYXoub3JnL3JlY29yZHMwQQYDVR0fBDowODA2oDSgMoYwaHR0cHM6Ly9pc3N1ZXIubXVsdGlwYXoub3JnL3JlY29yZHMvY3JsL3ZlcmlmaWVyMB4GA1UdJQEB/wQUMBIGByiBjF0FAQYGByiBtTQEAQYwHQYDVR0OBBYEFCmPDKtpfqH4GMJCmU+SFO3zB0tJMAoGCCqGSM49BAMDA2gAMGUCMQC7fsZi+ee8+166MXcw8jp/w1/F3uS6QfUSZcMlHxxP6UB0ufWjdhZ3s/TD5HpsZIkCMGImWURFegV2x8TZjnaCoHFMf1jrri9C0Eem7be5o3rjKGtjEkU9R6MfpSom00LWcw=="],
-			usage: .mdocReaderAuth, expectedValid: false
+			name: "EUDI reader certs",
+			leafPEMs: ["MIIDEDCCAragAwIBAgIUE1oN09EvmTiIbgp1+U580bHJB+MwCgYIKoZIzj0EAwIwXDEeMBwGA1UEAwwVUElEIElzc3VlciBDQSAtIFVUIDAyMS0wKwYDVQQKDCRFVURJIFdhbGxldCBSZWZlcmVuY2UgSW1wbGVtZW50YXRpb24xCzAJBgNVBAYTAlVUMB4XDTI1MDQxMDA3NTMxNFoXDTI3MDQxMDA3NTMxM1owVzEdMBsGA1UEAwwURVVESSBSZW1vdGUgVmVyaWZpZXIxCjAIBgNVBAUTATExHTAbBgNVBAoMFEVVREkgUmVtb3RlIFZlcmlmaWVyMQswCQYDVQQGEwJVVDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABJ82icfMX+TdiUvdHIwqEb6GK12qvPV5voIHjPaQpszCyxztrMKroDWvDdvAnf4LcM5pYOSwRPZeBniCCoglIVmjggFZMIIBVTAMBgNVHRMBAf8EAjAAMB8GA1UdIwQYMBaAFGLHlEcovQ+iFiCnmsJJlETxAdPHMD0GA1UdEQQ2MDSBEm5vLXJlcGx5QGV1ZGl3LmRldoIeZGV2LnZlcmlmaWVyLWJhY2tlbmQuZXVkaXcuZGV2MBIGA1UdJQQLMAkGByiBjF0FAQYwQwYDVR0fBDwwOjA4oDagNIYyaHR0cHM6Ly9wcmVwcm9kLnBraS5ldWRpdy5kZXYvY3JsL3BpZF9DQV9VVF8wMi5jcmwwHQYDVR0OBBYEFCmeAKpB8pI5fHjL4un1Zs4q3VqEMA4GA1UdDwEB/wQEAwIHgDBdBgNVHRIEVjBUhlJodHRwczovL2dpdGh1Yi5jb20vZXUtZGlnaXRhbC1pZGVudGl0eS13YWxsZXQvYXJjaGl0ZWN0dXJlLWFuZC1yZWZlcmVuY2UtZnJhbWV3b3JrMAoGCCqGSM49BAMCA0gAMEUCIQCgAJYQQgz8w84Autp1slBNPDAF1gS82xyzXCUqQlDE/QIgTzccKF5X980M26fsvyGzyzmp26qtGOwst2wd9dikqmk="],
+			usage: .mdocReaderAuth, expectedValid: true
 		),
 	])
-	func isMdocX5cValidParameterized(testCase: X5cValidationTestCase) throws {
+	func isMdocX5cValidParameterized(testCase: X5cValidationTestCase) async throws {
 		let leafCerts = testCase.leafPEMs.compactMap { Self.secCertificate(fromPEM: $0) }
 		let (isValid, messages, _) = SecurityHelpers.isMdocX5cValid(
-			secCerts: leafCerts, usage: testCase.usage, rootIaca: [multipazIaca])
+			secCerts: leafCerts, usage: testCase.usage, rootIaca: [eudiIaca])
 		#expect(isValid == testCase.expectedValid, "Test '\(testCase.name)' expected isValid=\(testCase.expectedValid), got \(isValid). Messages: \(messages)")
 		print("Test '\(testCase.name)' messages:", messages)
+		let (isValid2, messages2, _) = await SecurityHelpers.isChainFound(secCerts: leafCerts, rootIaca: [eudiIaca])
+		#expect(isValid2 == testCase.expectedValid, "Test '\(testCase.name)' expected isValid2=\(testCase.expectedValid), got \(isValid2). Messages: \(messages2)")
 	}
-
-}
+}	
 
 /// Test case for parameterized isMdocX5cValid tests
 struct X5cValidationTestCase: Sendable, CustomTestStringConvertible {
