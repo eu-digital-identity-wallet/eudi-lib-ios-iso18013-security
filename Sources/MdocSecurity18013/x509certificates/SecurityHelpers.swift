@@ -102,6 +102,7 @@ public class SecurityHelpers {
 	}
     
     public static func isChainFound(secCerts: x5chain, rootIaca: [x5chain]) async -> (isValid: Bool, validationMessages: [String], rootCert: SecCertificate?) {
+        var validationMessages: [String] = []
         guard let leafSecCert = secCerts.first, let leafCert = try? leafSecCert.certificate() else {
             return (false, ["Certificate not found"], nil)
         }
@@ -111,9 +112,9 @@ public class SecurityHelpers {
             let rootCerts = rootChain.compactMap { try? $0.certificate() }
             guard !rootCerts.isEmpty else { continue }
             let (isValid, messages) = await verifyChain(rootCertificates: rootCerts, intermediateCertificates: intermediateCerts, leafCertificate: leafCert)
-            if isValid { return (true, messages, rootSecCert) }
+            if isValid { return (true, messages, rootSecCert) } else { validationMessages = messages }
         }
-        return (false, ["Certificate chain not matched with root certificates"], nil)
+        return (false, ["Certificate chain not matched with root certificates"] + validationMessages, nil)
     }
 
 	public static func verifyChain(rootCertificates: [Certificate], intermediateCertificates: [Certificate] = [], leafCertificate: Certificate) async -> (Bool, [String]) {
