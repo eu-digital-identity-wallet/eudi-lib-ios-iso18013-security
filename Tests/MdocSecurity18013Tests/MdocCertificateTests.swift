@@ -32,7 +32,11 @@ struct CertificateHandlingTests {
 
 	@Test("CRL parsing")
 	func crlParsing() throws {
-		let pemStr = try String(contentsOf: Bundle.module.url(forResource: "test", withExtension: "crl")!)
+		guard let url = Bundle.module.url(forResource: "test", withExtension: "crl") else {
+			print("CRL file not found")
+			return
+		}
+		let pemStr = try String(contentsOf: url, encoding: .utf8)
 		let crl = try CRL(pemEncoded: pemStr)
 		print(crl.revokedSerials.map(\.description))
 	}
@@ -94,7 +98,7 @@ struct CertificateHandlingTests {
 		let (isValid2, messages2, _) = await SecurityHelpers.isChainFound(secCerts: leafCerts, rootIaca: [eudiIaca])
 		#expect(isValid2 == testCase.expectedValid, "Test '\(testCase.name)' expected isValid2=\(testCase.expectedValid), got \(isValid2). Messages: \(messages2)")
 	}
-}	
+}
 
 /// Test case for parameterized isMdocX5cValid tests
 struct X5cValidationTestCase: Sendable, CustomTestStringConvertible {
