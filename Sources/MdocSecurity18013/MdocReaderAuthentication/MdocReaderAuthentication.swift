@@ -34,7 +34,7 @@ public struct MdocReaderAuthentication: Sendable {
 	///   - readerAuthCertificate: The reader auth certificate decoded from above reader-auth structure. Contains the mdoc reader public key
 	///   - itemsRequestRawData: Reader's item request raw data
 	/// - Returns: (True if verification of reader auth has valid signature, reason for certificate validation failure)
-	public func validateReaderAuth(readerAuthCBOR: CBOR, readerAuthX5c: [Data], itemsRequestRawData: [UInt8], rootCerts: [SecCertificate]? = nil) throws -> (Bool, String?) {
+	public func validateReaderAuth(readerAuthCBOR: CBOR, readerAuthX5c: [Data], itemsRequestRawData: [UInt8], rootIaca: [x5chain]? = nil) throws -> (Bool, String?) {
 		let ra = ReaderAuthentication(sessionTranscript: transcript, itemsRequestRawData: itemsRequestRawData)
 		let contentBytes = ra.toCBOR(options: CBOROptions()).taggedEncoded.encode(options: CBOROptions())
 		let secCerts = readerAuthX5c.compactMap { SecCertificateCreateWithData(nil, $0 as CFData) }
@@ -43,7 +43,7 @@ public struct MdocReaderAuthentication: Sendable {
 		guard let publicKeyx963 = SecurityHelpers.getPublicKeyx963(ref: secCerts.first!) else { return (false, "Public key not found in certificate") }
 		let b1 = try readerAuth.validateDetachedCoseSign1(payloadData: Data(contentBytes), publicKey_x963: publicKeyx963)
 		guard b1 else { return (false, "Reader auth signature validation failed") }
-		let b2 = SecurityHelpers.isMdocX5cValid(secCerts: secCerts, usage: .mdocReaderAuth, rootCerts: rootCerts ?? [])
+		let b2 = SecurityHelpers.isMdocX5cValid(secCerts: secCerts, usage: .mdocReaderAuth, rootIaca: rootIaca ?? [])
 		if !b2.isValid { logger.warning(Logger.Message(unicodeScalarLiteral: b2.validationMessages.joined(separator: "\n"))) }
 		return (b1 && b2.isValid, b2.validationMessages.joined(separator: "\n"))
 	}

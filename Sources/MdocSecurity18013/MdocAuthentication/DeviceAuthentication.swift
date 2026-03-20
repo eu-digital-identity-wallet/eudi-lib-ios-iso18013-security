@@ -34,7 +34,7 @@ import MdocDataModel18013
       }
   }
 
-public enum DeviceAuthMethod: String {
+public enum DeviceAuthMethod: String, Sendable {
 	case deviceSignature
 	case deviceMac
 }

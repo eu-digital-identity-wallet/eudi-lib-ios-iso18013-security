@@ -24,10 +24,17 @@ import MdocDataModel18013
 public actor SampleDataSecureArea: SecureArea {
 
     public let storage: any SecureKeyStorage
-    public nonisolated(unsafe) var x963Key: Data?
+    private var x963Key: Data?
 
-    init(storage: any SecureKeyStorage) {
+    public init(storage: any SecureKeyStorage, x963Key: Data? = nil) {
         self.storage = storage
+        self.x963Key = x963Key
+    }
+
+    /// Sets the x963 key representation for use in key creation.
+    /// - Parameter key: The x963 representation of the private key.
+    public func setX963Key(_ key: Data?) {
+        self.x963Key = key
     }
     nonisolated public static func create(storage: any MdocDataModel18013.SecureKeyStorage) -> SampleDataSecureArea {
         SampleDataSecureArea(storage: storage)
@@ -54,6 +61,11 @@ public actor SampleDataSecureArea: SecureArea {
         try await storage.writeKeyInfo(id: id, dict: [kSecValueData as String: kbi.toData() ?? Data(), kSecAttrDescription as String: curve.jwkName.data(using: .utf8)!])
         try await storage.writeKeyDataBatch(id: id, startIndex: 0, dicts: [[kSecValueData as String: x963Priv]], keyOptions: keyOptions)
         return [CoseKey(crv: curve, x963Representation: x963Pub)]
+    }
+    
+    public func getPublicKey(id: String, index: Int, curve: CoseEcCurve) async throws -> CoseKey {
+        let softwareSA = SoftwareSecureArea(storage: storage)
+        return try await softwareSA.getPublicKey(id: id, index: index, curve: curve)
     }
 
     /// delete key

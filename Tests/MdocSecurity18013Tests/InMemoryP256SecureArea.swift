@@ -23,10 +23,17 @@ public actor InMemoryP256SecureArea: SecureArea {
 
     var storage: any MdocDataModel18013.SecureKeyStorage
     var key: P256.Signing.PrivateKey!
-    public nonisolated(unsafe) var x963Key: Data?
+    private var x963Key: Data?
 
-    init(storage: any MdocDataModel18013.SecureKeyStorage) {
+    init(storage: any MdocDataModel18013.SecureKeyStorage, x963Key: Data? = nil) {
         self.storage = storage
+        self.x963Key = x963Key
+    }
+
+    /// Sets the x963 key representation for use in key creation.
+    /// - Parameter key: The x963 representation of the private key.
+    public func setX963Key(_ key: Data?) {
+        self.x963Key = key
     }
     nonisolated public static func create(storage: any MdocDataModel18013.SecureKeyStorage) -> InMemoryP256SecureArea {
         InMemoryP256SecureArea(storage: storage)
@@ -44,6 +51,10 @@ public actor InMemoryP256SecureArea: SecureArea {
     public func createKeyBatch(id: String, credentialOptions: CredentialOptions, keyOptions: KeyOptions?) async throws -> [CoseKey] {
         let res = try await createKey(id: id, index: 0, keyOptions: keyOptions)
         return [res]
+    }
+    
+    public func getPublicKey(id: String, index: Int, curve: CoseEcCurve) async throws -> CoseKey {
+        return CoseKey(crv: .P256, x963Representation: key.publicKey.x963Representation)
     }
 
     public func deleteKeyBatch(id: String, startIndex: Int, batchSize: Int) throws { }
@@ -86,10 +97,9 @@ extension MdocDataModel18013.CoseKeyPrivate {
   // decode cbor string
     public init?(p256data base64: String) {
         guard let d = Data(base64Encoded: base64), let obj = try? CBOR.decode([UInt8](d)), let coseKey = try? CoseKey(cbor: obj), let cd = obj[-4], case let CBOR.byteString(rd) = cd else { return nil }
-        let sampleSA = InMemoryP256SecureArea(storage: DummySecureKeyStorage())
         let keyData = NSMutableData(bytes: [0x04], length: [0x04].count)
         keyData.append(Data(coseKey.x)); keyData.append(Data(coseKey.y)); keyData.append(Data(rd))
-        sampleSA.x963Key = keyData as Data
+        let sampleSA = InMemoryP256SecureArea(storage: DummySecureKeyStorage(), x963Key: keyData as Data)
         self.init(secureArea: sampleSA)
     }
 
@@ -100,10 +110,9 @@ extension MdocDataModel18013.CoseKeyPrivate {
     ///   - d: /// value of x-coordinate
     ///   - crv: /// EC identifier
     public init(x: [UInt8], y: [UInt8], d: [UInt8], crv: CoseEcCurve = .P256) {
-        let sampleSA = InMemoryP256SecureArea(storage: DummySecureKeyStorage())
         let keyData = NSMutableData(bytes: [0x04], length: [0x04].count)
         keyData.append(Data(x)); keyData.append(Data(y)); keyData.append(Data(d))
-        sampleSA.x963Key = keyData as Data
+        let sampleSA = InMemoryP256SecureArea(storage: DummySecureKeyStorage(), x963Key: keyData as Data)
         self.init(secureArea: sampleSA)
         self.key = CoseKey(x: x, y: y, crv: crv)
     }
