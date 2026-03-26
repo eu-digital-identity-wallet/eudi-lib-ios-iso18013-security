@@ -14,8 +14,7 @@ let package = Package(
     ],
     dependencies: [
         // .package(path: "../eudi-lib-ios-iso18013-data-model"),
-        .package(url: "https://github.com/eu-digital-identity-wallet/eudi-lib-ios-iso18013-data-model.git", exact: "0.11.2"),
-        .package(url: "https://github.com/apple/swift-log.git", from: "1.5.3"),
+        .package(url: "https://github.com/eu-digital-identity-wallet/eudi-lib-ios-iso18013-data-model.git", exact: "0.11.3"),
         .package(url: "https://github.com/apple/swift-certificates.git", .upToNextMajor(from: "1.0.0")),
     ],
     targets: [
@@ -25,7 +24,6 @@ let package = Package(
             name: "MdocSecurity18013",
             dependencies: [
                 .product(name: "MdocDataModel18013", package: "eudi-lib-ios-iso18013-data-model"),
-                 .product(name: "Logging", package: "swift-log"),
                  .product(name: "X509", package: "swift-certificates"),
             ],
             //swiftSettings: [.enableUpcomingFeature("InferIsolatedConformances"), .enableUpcomingFeature("NonisolatedNonsendingByDefault")],
