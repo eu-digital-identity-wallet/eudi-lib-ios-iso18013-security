@@ -114,7 +114,11 @@ extension SecKey {
         var attributes: [String: Any] = [kSecAttrKeyType as String: type.secAttrKeyTypeValue, kSecAttrKeyClass as String: kSecAttrKeyClassPrivate, kSecAttrKeySizeInBits as String: NSNumber(integerLiteral: bits)]
         if let keyId {
             let tag = keyId.data(using: .utf8)!
-            attributes[kSecPrivateKeyAttrs as String] = [kSecAttrIsPermanent as String: true, kSecAttrApplicationTag as String: tag]
+            attributes[kSecPrivateKeyAttrs as String] = [
+                kSecAttrIsPermanent as String: true,
+                kSecAttrApplicationTag as String: tag,
+                kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+            ]
         }
         var error: Unmanaged<CFError>?
         guard let key = SecKeyCreateRandomKey(attributes as CFDictionary, &error) else { throw error!.takeRetainedValue() as Error }
