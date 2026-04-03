@@ -19,10 +19,10 @@ import SwiftASN1
 import X509
 
 struct CRL: PEMParseable, DERParseable {
-	var serialNumber: Int64
+	var version: Int64
 	var issuer: DistinguishedName
-	var validity: UTCTime
-	var subject: UTCTime
+	var thisUpdate: UTCTime
+	var nextUpdate: UTCTime
 	var revokedSerials: [CRLSerialInfo] = []
 	static let defaultPEMDiscriminator: String = "X509 CRL"
 
@@ -48,15 +48,22 @@ struct CRL: PEMParseable, DERParseable {
 		guard let n1 = nodesIter.next() else { throw Self.toError(node: node) } // tbsCertificate
 		guard case .constructed(let nodes1) = n1.content else { throw Self.toError(node: n1) }
 		var nodes1Iter = nodes1.makeIterator()
-		serialNumber = try Int64(derEncoded: &nodes1Iter)
+		version = try Int64(derEncoded: &nodes1Iter)
 		_ = nodes1Iter.next() // skip signature
 		guard let issuerNode = nodes1Iter.next() else { throw Self.toError(node: n1) }
 		issuer = try DistinguishedName(derEncoded: issuerNode)
-		validity = try SwiftASN1.UTCTime(derEncoded: &nodes1Iter)
-		subject = try SwiftASN1.UTCTime(derEncoded: &nodes1Iter)
+		thisUpdate = try SwiftASN1.UTCTime(derEncoded: &nodes1Iter)
+		nextUpdate = try SwiftASN1.UTCTime(derEncoded: &nodes1Iter)
 		guard let n2 = nodes1Iter.next() else { throw Self.toError(node: n1) } // subject public key info
 		guard case .constructed(let nodes3) = n2.content else { throw Self.toError(node: n2) }
 		revokedSerials = nodes3.compactMap { try? CRLSerialInfo(derEncoded: $0) }
+	}
+
+	var isValid: Bool {
+		let c = Calendar.current
+		let dc = c.dateComponents(in: TimeZone(identifier: "UTC")!, from: Date())
+		guard let now = try? UTCTime(year: dc.year!, month: dc.month!, day: dc.day!, hours: dc.hour!, minutes: dc.minute!, seconds: dc.second!) else { return false }
+		return thisUpdate <= now && now <= nextUpdate
 	}
 
 	static func toError(node: SwiftASN1.ASN1Node) -> NSError {

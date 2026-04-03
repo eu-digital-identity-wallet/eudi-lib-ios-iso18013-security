@@ -143,6 +143,10 @@ public class SecurityHelpers {
 				guard let crlUrl = URL(string: crl.distributionPoint) else { continue }
 				guard let pem = try? String(contentsOf: crlUrl) else { continue }
 				guard let crl = try? CRL(pemEncoded: pem) else { continue }
+				guard crl.isValid else {
+					logger.warning("CRL from \(crlUrl) is not within its validity period (thisUpdate: \(crl.thisUpdate), nextUpdate: \(crl.nextUpdate))")
+					continue
+				}
 				res.append(contentsOf: crl.revokedSerials.map(\.serial))
 			}
 		}
