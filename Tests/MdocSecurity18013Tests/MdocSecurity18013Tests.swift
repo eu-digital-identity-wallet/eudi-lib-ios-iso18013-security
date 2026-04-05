@@ -16,6 +16,7 @@ limitations under the License.
 import Foundation
 import Testing
 import SwiftCBOR
+import Security
 
 @testable import MdocDataModel18013
 @testable import MdocSecurity18013
@@ -110,9 +111,24 @@ struct MdocSecurity18013Tests {
 		for docR in dr.docRequests {
 			let mdocAuth = MdocReaderAuthentication(transcript: sessionEncr.sessionTranscript)
 			guard let readerAuthRawCBOR = docR.readerAuthRawCBOR else { continue }
-			let (b, message) = try mdocAuth.validateReaderAuth(readerAuthCBOR: readerAuthRawCBOR, readerAuthX5c: docR.readerCertificates, itemsRequestRawData: docR.itemsRequestRawData!)
+			let (b, message) = try mdocAuth.validateReaderAuth(readerAuthCBOR: readerAuthRawCBOR, readerAuthX5c: docR.readerCertificates, itemsRequestRawData: docR.itemsRequestRawData!, rootIaca: [])
 			#expect(!b, "Current date not in validity period of Certificate")
             print(message ?? "")
 		}
 	}
+
+    @Test("Validate readerAuth certificate chain trust with root IACA from annex D.4.11")
+    func validateReaderAuthCertificateTrustedWithRootIacaAnnexD411() throws {
+        let dr = try DeviceRequest(data: AnnexdTestData.request_d411.bytes)
+        let docR = try #require(dr.docRequests.first)
+        let leafData = try #require(docR.readerCertificates.first)
+        let leafCert = try #require(SecCertificateCreateWithData(nil, leafData as CFData))
+        let rootCert = try #require(SecCertificateCreateWithData(nil, AnnexdTestData.d54_readerRoot as CFData))
+        let rootIaca: [x5chain] = [[rootCert]]
+	    let mdocAuth = MdocReaderAuthentication(transcript: sessionEncr.sessionTranscript)
+        guard let readerAuthRawCBOR = docR.readerAuthRawCBOR else { continue }
+        let (b, message) = try mdocAuth.validateReaderAuth(readerAuthCBOR: readerAuthRawCBOR, readerAuthX5c: docR.readerCertificates, itemsRequestRawData: docR.itemsRequestRawData!, rootIaca: rootIaca)
+        #expect(!b, "Current date not in validity period of Certificate")
+        print(message ?? "")
+     }
 }
