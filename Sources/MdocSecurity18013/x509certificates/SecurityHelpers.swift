@@ -82,7 +82,7 @@ public class SecurityHelpers {
 				if usage == .mdocReaderAuth, let rootGns = x509root.getSubjectAlternativeNames(), let gns = x509cert.getSubjectAlternativeNames() {
 					guard gns.elementsEqual(rootGns) else { return (false, ["Issuer data rfc822Name or uniformResourceIdentifier do not match with root cert."], nil) }
 				}
-				let bs = fetchCRLSerialNumbers(x509root)
+				let bs = fetchCRLSerialNumbers(x509root, messages: &messages)
 				if !bs.isEmpty {
 					if bs.contains(x509cert.serialNumber) { return (false, ["Revoked issued Certificate"], rootCert)}
 					if bs.contains(x509root.serialNumber) { return (false,["Revoked Root Certificate"], rootCert)}
@@ -100,7 +100,7 @@ public class SecurityHelpers {
 		//if let error { logger.error("Error evaluating trust: \(error)") }
         return (isValid, error?.localizedDescription, (error as? NSError)?.code)
 	}
-    
+
     public static func isChainFound(secCerts: x5chain, rootIaca: [x5chain]) async -> (isValid: Bool, validationMessages: [String], rootCert: SecCertificate?) {
         var validationMessages: [String] = []
         guard let leafSecCert = secCerts.first, let leafCert = try? leafSecCert.certificate() else {
@@ -136,21 +136,22 @@ public class SecurityHelpers {
     }
   }
 
- public static func fetchCRLSerialNumbers(_ x509root: X509.Certificate) -> [Certificate.SerialNumber] {
-		var res = [Certificate.SerialNumber]()
+ public static func fetchCRLSerialNumbers(_ x509root: X509.Certificate, messages: inout [String]) -> [Certificate.SerialNumber] {
+		var bs = [Certificate.SerialNumber]()
 		if let ext = x509root.extensions[oid: .X509ExtensionID.cRLDistributionPoints], let crlDistr = try? CRLDistributions(derEncoded: ext.value) {
 			for crl in crlDistr.crls {
 				guard let crlUrl = URL(string: crl.distributionPoint) else { continue }
 				guard let pem = try? String(contentsOf: crlUrl) else { continue }
 				guard let crl = try? CRL(pemEncoded: pem) else { continue }
 				guard crl.isValid else {
-					logger.warning("CRL from \(crlUrl) is not within its validity period (thisUpdate: \(crl.thisUpdate), nextUpdate: \(crl.nextUpdate))")
+					let errorMessage = "CRL from \(crlUrl) is not within its validity period (thisUpdate: \(crl.thisUpdate), nextUpdate: \(crl.nextUpdate))"
+					messages.append(errorMessage)
 					continue
 				}
-				res.append(contentsOf: crl.revokedSerials.map(\.serial))
+				bs.append(contentsOf: crl.revokedSerials.map(\.serial))
 			}
 		}
-		return res
+		return bs
 	}
 
 	public static func verifyReaderAuthCert(_ x509: X509.Certificate, messages: inout [String]) {
