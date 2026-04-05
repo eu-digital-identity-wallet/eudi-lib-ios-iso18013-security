@@ -63,10 +63,10 @@ public class SecurityHelpers {
 		guard !x509cert.subject.isEmpty, let cn = getCommonName(ref: secCert), !cn.isEmpty else { return (false, ["Missing Common Name of Reader Certificate"], nil) }
 		guard !x509cert.signature.description.isEmpty else { return (false, ["Missing Signature data"], nil) }
 		if x509cert.serialNumber.description.isEmpty { messages.append("Missing Serial number") }
-		// not critical errors below
-		if x509cert.hasDuplicateExtensions() { messages.append("Duplicate extensions in Certificate") }
+		guard !x509cert.hasDuplicateExtensions() else { return (false, ["Duplicate extensions in Certificate"], nil) }
 		if usage == .mdocReaderAuth {
-			verifyReaderAuthCert(x509cert, messages: &messages)
+			let (isValidExt, extError) = verifyReaderAuthCert(x509cert, messages: &messages)
+			if !isValidExt { return (false, [extError ?? "Certificate extension validation failed"], nil) }
 			if let gns = x509cert.getSubjectAlternativeNames(), let gn = gns.first(where: { switch $0 { case .rfc822Name(_): true; case .uniformResourceIdentifier(_): true;  default: false } }) { logger.info("Alternative name \(gn.description)")}
 		}
 		SecTrustSetPolicies(trust, policy)
@@ -165,7 +165,10 @@ public class SecurityHelpers {
 		return bs
 	}
 
-	public static func verifyReaderAuthCert(_ x509: X509.Certificate, messages: inout [String]) {
+	/// Verify reader auth certificate extensions and properties.
+	/// - Returns: A tuple of (isValid, errorMessage). If isValid is false, validation must fail.
+	@discardableResult
+	public static func verifyReaderAuthCert(_ x509: X509.Certificate, messages: inout [String]) -> (Bool, String?) {
 		// check issuer
 		if !x509.issuer.isEmpty { logger.info("Issuer \(x509.issuer.description)")} else { messages.append("Missing Issuer") }
 		// check authority key identifier
@@ -185,12 +188,13 @@ public class SecurityHelpers {
 		// display extended OCSP extension
 		if let ext_ocsp = try? x509.extensions.authorityInformationAccess, let infoAccesses = ext_ocsp.infoAccesses, let infoAccess = infoAccesses.first, infoAccess.method == .ocspServer, !infoAccess.location.description.isEmpty { logger.info("OCSP server location: \(infoAccess.location.description)") }
 		if x509.signatureAlgorithm.isECDSA256or384or512 { logger.info("Signature algorithm is \(x509.signatureAlgorithm)")} else { messages.append("Signature algorithm must be ECDSA with SHA 256/384/512") }
-		// check for not allowed critical extensions
+		// check for not allowed critical extensions — must cause validation failure per RFC 5280 Section 4.2
 		let criticalExtensionOIDs: [String] = x509.extensions.filter(\.critical).map(\.oid).map(\.description)
 		let notAllowedCriticalExt = Set(criticalExtensionOIDs).intersection(Set(Self.nonAllowedExtensions))
-		if notAllowedCriticalExt.isEmpty { logger.info("Critical extensions correct") } else { messages.append("Not allowed critical extensions \(notAllowedCriticalExt)") }
+		if notAllowedCriticalExt.isEmpty { logger.info("Critical extensions correct") } else { return (false, "Not allowed critical extensions \(notAllowedCriticalExt)") }
 		// check crls existing
 		if let crlExt1 = x509.extensions[oid: .X509ExtensionID.cRLDistributionPoints], let crlExt2 = try? CRLDistributionPointsExtension(crlExt1), !crlExt2.crls.isEmpty, crlExt2.crls.allSatisfy(\.isNotEmpty) { logger.info("CRL Distribution extension found") } else { messages.append("Missing CRL Distribution extension") }
+		return (true, nil)
 	}
 
 	public static func getCommonName(ref: SecCertificate) -> String? {
