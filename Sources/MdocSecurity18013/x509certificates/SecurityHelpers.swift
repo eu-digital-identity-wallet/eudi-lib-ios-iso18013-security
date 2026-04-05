@@ -141,11 +141,22 @@ public class SecurityHelpers {
 		if let ext = x509root.extensions[oid: .X509ExtensionID.cRLDistributionPoints], let crlDistr = try? CRLDistributions(derEncoded: ext.value) {
 			for crl in crlDistr.crls {
 				guard let crlUrl = URL(string: crl.distributionPoint) else { continue }
-				guard let pem = try? String(contentsOf: crlUrl) else { continue }
-				guard let crl = try? CRL(pemEncoded: pem) else { continue }
+				guard let crlData = try? Data(contentsOf: crlUrl) else { continue }
+				let crl: CRL
+				if let pemString = String(data: crlData, encoding: .utf8), pemString.contains("-----BEGIN") {
+					guard let pemCrl = try? CRL(pemEncoded: pemString) else { continue }
+					crl = pemCrl
+				} else {
+					guard let derCrl = try? CRL(derEncoded: Array(crlData)) else { continue }
+					crl = derCrl
+				}
 				guard crl.isValid else {
 					let errorMessage = "CRL from \(crlUrl) is not within its validity period (thisUpdate: \(crl.thisUpdate), nextUpdate: \(crl.nextUpdate))"
 					messages.append(errorMessage)
+					continue
+				}
+				guard crl.verifySignature(issuer: x509root) else {
+					messages.append("CRL from \(crlUrl) has an invalid signature")
 					continue
 				}
 				bs.append(contentsOf: crl.revokedSerials.map(\.serial))

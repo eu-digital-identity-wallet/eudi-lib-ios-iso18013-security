@@ -15,10 +15,12 @@ limitations under the License.
 */
 import Foundation
 import Testing
+import Security
 import SwiftASN1
 import X509
 
 @testable import MdocSecurity18013
+@testable import MdocDataModel18013
 
 @Suite("CRL Tests")
 struct CRLTests {
@@ -54,6 +56,35 @@ struct CRLTests {
 	j0o=
 	-----END X509 CRL-----
 	"""
+
+    static let crlDistributionPointUrl = "https://preprod.pki.eudiw.dev/crl/pid_CA_UT_02.crl"
+
+	@Test("fetchCRLSerialNumbers validates CRL signature from distribution point")
+	func fetchCRLSerialNumbersFromDistributionPoint() throws {
+		let derData = try Data(contentsOf: Bundle.module.url(forResource: "pidissuerca02_ut", withExtension: "der")!)
+		let secCert = try #require(SecCertificateCreateWithData(nil, derData as CFData))
+		let x509root = try secCert.certificate()
+		// Verify the certificate has a CRL distribution point matching our URL
+		let ext = try #require(x509root.extensions[oid: .X509ExtensionID.cRLDistributionPoints])
+		let crlDistr = try CRLDistributions(derEncoded: ext.value)
+		#expect(crlDistr.crls.contains(where: { $0.distributionPoint == Self.crlDistributionPointUrl }))
+		// Fetch and parse the CRL (may be DER or PEM encoded), verifying its signature
+		let crlData = try Data(contentsOf: URL(string: Self.crlDistributionPointUrl)!)
+		let crl: CRL
+		if let pemString = String(data: crlData, encoding: .utf8), pemString.contains("-----BEGIN") {
+			crl = try CRL(pemEncoded: pemString)
+		} else {
+			crl = try CRL(derEncoded: Array(crlData))
+		}
+		#expect(crl.isValid)
+		#expect(crl.signatureAlgorithm != nil)
+		#expect(crl.verifySignature(issuer: x509root), "CRL signature must be valid against issuing CA")
+		// Also verify via fetchCRLSerialNumbers which integrates all checks
+		var messages = [String]()
+		let serials = SecurityHelpers.fetchCRLSerialNumbers(x509root, messages: &messages)
+		#expect(!messages.contains(where: { $0.contains("invalid signature") }), "fetchCRLSerialNumbers should not report signature errors: \(messages)")
+		print("Fetched \(serials.count) revoked serial(s), messages: \(messages)")
+	}
 
 	@Test("Parse valid CRL with no revoked certificates")
 	func parseEmptyCRL() throws {
