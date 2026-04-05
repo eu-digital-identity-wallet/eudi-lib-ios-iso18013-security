@@ -67,9 +67,10 @@ struct CRL: PEMParseable, DERParseable {
 		issuer = try DistinguishedName(derEncoded: issuerNode)
 		thisUpdate = try SwiftASN1.UTCTime(derEncoded: &nodes1Iter)
 		nextUpdate = try SwiftASN1.UTCTime(derEncoded: &nodes1Iter)
-		guard let n2 = nodes1Iter.next() else { throw Self.toError(node: tbsCertListNode) } // revokedCertificates
-		guard case .constructed(let nodes3) = n2.content else { throw Self.toError(node: n2) }
-		revokedSerials = nodes3.compactMap { try? CRLSerialInfo(derEncoded: $0) }
+		// revokedCertificates is OPTIONAL; the next node may be extensions ([0] EXPLICIT) or absent
+		if let n2 = nodes1Iter.next(), n2.identifier == .sequence, case .constructed(let nodes3) = n2.content {
+			revokedSerials = try nodes3.map { try CRLSerialInfo(derEncoded: $0) }
+		}
 	}
 
 	// OID constants for signature algorithms not publicly exposed by swift-asn1
