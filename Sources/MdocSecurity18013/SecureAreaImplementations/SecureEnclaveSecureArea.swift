@@ -46,7 +46,8 @@ public actor SecureEnclaveSecureArea: SecureArea {
             res.append(CoseKey(crv: .P256, x963Representation: key.publicKey.x963Representation))
         }
         let kbi = KeyBatchInfo(secureAreaName: Self.name, crv: .P256, usedCounts: Array(repeating: 0, count: batchSize), credentialPolicy: credentialOptions.credentialPolicy)
-        try await storage.writeKeyInfo(id: id, dict: [kSecValueData as String: kbi.toData() ?? Data(), kSecAttrDescription as String: Self.defaultEcCurve.jwkName.data(using: .utf8)!])
+        guard let kbiData = kbi.toData() else { throw SecureAreaError("Failed to encode KeyBatchInfo") }
+        try await storage.writeKeyInfo(id: id, dict: [kSecValueData as String: kbiData, kSecAttrDescription as String: Self.defaultEcCurve.jwkName.data(using: .utf8)!])
         try await storage.writeKeyDataBatch(id: id, startIndex: 0, dicts: dicts, keyOptions: keyOptions)
         return res
     }
