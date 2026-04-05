@@ -16,11 +16,40 @@ limitations under the License.
 
 import Testing
 import Foundation
+import SwiftCBOR
+import X509
 @testable import MdocDataModel18013
 @testable import MdocSecurity18013
 
 @Suite("MSO Validation Tests")
 struct MsoValidationTests {
+
+    private func makeIssuerSignedFromAnnexD52() throws -> IssuerSigned {
+        let cbor = try #require(try CBOR.decode([UInt8](MdocSecurity18013Tests.AnnexdTestData.d52_issuerAuthCBOR)))
+        let issuerAuth = try IssuerAuth(cbor: cbor)
+        return IssuerSigned(issuerNameSpaces: nil, issuerAuth: issuerAuth)
+    }
+
+    private func cloneIssuerSigned(_ issuerSigned: IssuerSigned, with validityInfo: ValidityInfo) -> IssuerSigned {
+        let mso = issuerSigned.issuerAuth.mso
+        let msoUpdated = MobileSecurityObject(
+            version: mso.version,
+            digestAlgorithm: mso.digestAlgorithm,
+            valueDigests: mso.valueDigests,
+            deviceKey: mso.deviceKeyInfo.deviceKey,
+            docType: mso.docType,
+            validityInfo: validityInfo
+        )
+        let issuerAuthUpdated = IssuerAuth(
+            mso: msoUpdated,
+            msoRawData: issuerSigned.issuerAuth.msoRawData,
+            verifyAlgorithm: issuerSigned.issuerAuth.verifyAlgorithm,
+            signature: issuerSigned.issuerAuth.signature,
+            x5chain: issuerSigned.issuerAuth.x5chain,
+            statusIdentifier: issuerSigned.issuerAuth.statusIdentifier
+        )
+        return IssuerSigned(issuerNameSpaces: issuerSigned.issuerNameSpaces, issuerAuth: issuerAuthUpdated)
+    }
 
     @Test("MSO verifications run successfully")
     func testMsoValidations() async throws {
@@ -37,6 +66,64 @@ struct MsoValidationTests {
                 errors.forEach { print($0.errorDescription ?? "Unknown error") }
             default: print(error.errorDescription ?? "Unknown error") }
         }
+    }
+
+    @Test("MSO validity rejects equal validFrom and validUntil")
+    func msoValidationRejectsEqualValidFromAndValidUntil() throws {
+        let issuerSigned = try makeIssuerSignedFromAnnexD52()
+        let mso = issuerSigned.issuerAuth.mso
+        let equalDatesValidityInfo = ValidityInfo(
+            signed: mso.validityInfo.signed,
+            validFrom: mso.validityInfo.validFrom,
+            validUntil: mso.validityInfo.validFrom,
+            expectedUpdate: mso.validityInfo.expectedUpdate
+        )
+        let issuerSignedWithEqualDates = cloneIssuerSigned(issuerSigned, with: equalDatesValidityInfo)
+        let errors = issuerSignedWithEqualDates.validateValidityInfo(mso: issuerSignedWithEqualDates.issuerAuth.mso) ?? []
+        #expect(errors.contains(where: { error in
+            if case .validityInfo(let reason) = error {
+                return reason.contains("strictly earlier")
+            }
+            return false
+        }))
+    }
+
+    @Test("MSO validity can reject validUntil beyond certificate expiry")
+    func msoValidationRejectsValidUntilAfterCertificateExpiryWhenConfigured() throws {
+        let issuerSigned = try makeIssuerSignedFromAnnexD52()
+        let dsCert = try X509.Certificate(derEncoded: issuerSigned.issuerAuth.x5chain[0])
+        let mso = issuerSigned.issuerAuth.mso
+        let overflowDate = dsCert.notValidAfter.addingTimeInterval(60)
+        let isoOverflowDate = ISO8601DateFormatter().string(from: overflowDate)
+        let validityInfo = ValidityInfo(
+            signed: mso.validityInfo.signed,
+            validFrom: mso.validityInfo.validFrom,
+            validUntil: isoOverflowDate,
+            expectedUpdate: mso.validityInfo.expectedUpdate
+        )
+        let issuerSignedOverflow = cloneIssuerSigned(issuerSigned, with: validityInfo)
+
+        let relaxedErrors = issuerSignedOverflow.validateValidityInfo(
+            mso: issuerSignedOverflow.issuerAuth.mso,
+            options: .init(rejectIfValidUntilExceedsCertificateValidity: false)
+        ) ?? []
+        #expect(!relaxedErrors.contains(where: { error in
+            if case .validityInfo(let reason) = error {
+                return reason.contains("exceeds certificate validity")
+            }
+            return false
+        }))
+
+        let strictErrors = issuerSignedOverflow.validateValidityInfo(
+            mso: issuerSignedOverflow.issuerAuth.mso,
+            options: .init(rejectIfValidUntilExceedsCertificateValidity: true)
+        ) ?? []
+        #expect(strictErrors.contains(where: { error in
+            if case .validityInfo(let reason) = error {
+                return reason.contains("exceeds certificate validity")
+            }
+            return false
+        }))
     }
 
 
