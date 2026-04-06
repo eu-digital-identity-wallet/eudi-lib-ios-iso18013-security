@@ -133,13 +133,6 @@ public actor SoftwareSecureArea: SecureArea {
         return sharedSecret
     }
 
-    func getInfoAndCurve(id: String) async throws -> ([String:Data], CoseEcCurve) {
-        let keyInfoDict = try await storage.readKeyInfo(id: id)
-        guard let jwkNameData = keyInfoDict[kSecAttrDescription as String], let jwkName = String(data: jwkNameData, encoding: .utf8) else { throw SecureAreaError("Key info description not found") }
-        let curve = try CoseEcCurve.fromJwkName(jwkName)
-        return (keyInfoDict, curve)
-    }
-
     func getKeyData(id: String, index: Int) async throws -> Data {
         let keyDataDict = try await storage.readKeyData(id: id, index: index)
         guard let x963Representation = keyDataDict[kSecValueData as String] else { throw SecureAreaError("Key data not found") }
