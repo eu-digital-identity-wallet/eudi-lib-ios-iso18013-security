@@ -34,8 +34,8 @@ extension UInt32 {
     return Data(bytes: &int, count: MemoryLayout<UInt32>.size)
   }
 	
-	/// Little endian encoding of bytes
-  public var byteArrayLittleEndian: [UInt8] {
+	/// Big endian encoding of bytes
+  public var byteArrayBigEndian: [UInt8] {
     return [
       UInt8((self & 0xFF000000) >> 24),
       UInt8((self & 0x00FF0000) >> 16),

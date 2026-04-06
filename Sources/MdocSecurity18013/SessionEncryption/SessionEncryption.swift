@@ -65,7 +65,7 @@ public struct SessionEncryption: Sendable {
 		var dataNonce = Data()
 		let identifier = isEncrypt ? encryptionIdentifier : decryptionIdentifier
 		dataNonce.append(Data(identifier))
-		dataNonce.append(Data(counter.byteArrayLittleEndian))
+		dataNonce.append(Data(counter.byteArrayBigEndian))
 		let nonce = try AES.GCM.Nonce(data: dataNonce)
 		return nonce
 	}
