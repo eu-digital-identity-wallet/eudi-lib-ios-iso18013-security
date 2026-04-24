@@ -59,7 +59,7 @@ extension IssuerSigned {
         guard let sd = mso.validityInfo.signed.convertToLocalDate(), let vf = mso.validityInfo.validFrom.convertToLocalDate(), let vu = mso.validityInfo.validUntil.convertToLocalDate() else { return [.validityInfo("MSO validity contains invalid strings")]}
         var errorList: [MsoValidationError] = []
         if !(sd >= dsCert.notValidBefore && sd <= dsCert.notValidAfter) { errorList.append(.validityInfo("The 'signed' date is not within the validity period of the certificate in the MSO: \(sd.formatted()) (\(dsCert.notValidBefore.formatted()) - \(dsCert.notValidAfter.formatted()))")) }
-		if !(vf <= .now && vf <= vu) { errorList.append(.validityInfo("Current timestamp is not equal or later than the ‘validFrom’ element: \(vf.formatted())")) }
+		if !(vf <= .now.addingTimeInterval(60) && vf <= vu) { errorList.append(.validityInfo("Current timestamp is not equal or later than the ‘validFrom’ element: \(vf.formatted())")) }
 		if !(vu >= .now) { errorList.append(.validityInfo("Current timestamp is not less than the ‘validUntil’ element: \(vu.formatted())")) }
         return errorList.isEmpty ? nil : errorList
     }
