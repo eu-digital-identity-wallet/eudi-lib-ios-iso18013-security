@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023 European Commission
+Copyright (c) 2026 European Commission
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -65,7 +65,7 @@ public struct SessionEncryption: Sendable {
 		var dataNonce = Data()
 		let identifier = isEncrypt ? encryptionIdentifier : decryptionIdentifier
 		dataNonce.append(Data(identifier))
-		dataNonce.append(Data(counter.byteArrayLittleEndian))
+		dataNonce.append(Data(counter.byteArrayBigEndian))
 		let nonce = try AES.GCM.Nonce(data: dataNonce)
 		return nonce
 	}

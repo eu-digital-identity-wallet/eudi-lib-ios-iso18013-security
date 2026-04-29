@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023 European Commission
+Copyright (c) 2026 European Commission
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ limitations under the License.
 import Foundation
 import Testing
 import SwiftCBOR
+import Security
 
 @testable import MdocDataModel18013
 @testable import MdocSecurity18013
@@ -110,7 +111,22 @@ struct MdocSecurity18013Tests {
 		for docR in dr.docRequests {
 			let mdocAuth = MdocReaderAuthentication(transcript: sessionEncr.sessionTranscript)
 			guard let readerAuthRawCBOR = docR.readerAuthRawCBOR else { continue }
-			let (b, message) = try mdocAuth.validateReaderAuth(readerAuthCBOR: readerAuthRawCBOR, readerAuthX5c: docR.readerCertificates, itemsRequestRawData: docR.itemsRequestRawData!)
+			let (b, message) = try mdocAuth.validateReaderAuth(readerAuthCBOR: readerAuthRawCBOR, readerAuthX5c: docR.readerCertificates, itemsRequestRawData: docR.itemsRequestRawData!, rootIaca: [])
+			#expect(!b, "Current date not in validity period of Certificate")
+            print(message ?? "")
+		}
+	}
+
+    @Test("Validate readerAuth certificate chain trust with root IACA from annex D.4.11")
+    func validateReaderAuthCertificateTrustedWithRootIacaAnnexD411() throws {
+		let (_,sessionEncr) = try #require(try makeSessionEncryptionFromAnnexData())
+        let dr = try DeviceRequest(data: AnnexdTestData.request_d411.bytes)
+        let rootCert = try #require(SecCertificateCreateWithData(nil, AnnexdTestData.d54_readerRoot as CFData))
+        let rootIaca: [x5chain] = [[rootCert]]
+		for docR in dr.docRequests {
+			let mdocAuth = MdocReaderAuthentication(transcript: sessionEncr.sessionTranscript)
+			guard let readerAuthRawCBOR = docR.readerAuthRawCBOR else { continue }
+			let (b, message) = try mdocAuth.validateReaderAuth(readerAuthCBOR: readerAuthRawCBOR, readerAuthX5c: docR.readerCertificates, itemsRequestRawData: docR.itemsRequestRawData!, rootIaca: rootIaca)
 			#expect(!b, "Current date not in validity period of Certificate")
             print(message ?? "")
 		}

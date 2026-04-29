@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023 European Commission
+Copyright (c) 2026 European Commission
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,15 +20,23 @@ import MdocDataModel18013
 import SwiftCBOR
 import X509
 
+public struct MsoValidationOptions: Sendable {
+    public let rejectIfValidUntilExceedsCertificateValidity: Bool
+
+    public init(rejectIfValidUntilExceedsCertificateValidity: Bool = false) {
+        self.rejectIfValidUntilExceedsCertificateValidity = rejectIfValidUntilExceedsCertificateValidity
+    }
+}
+
 extension IssuerSigned {
-    public func validate(docType: String) throws(MsoValidationError) {
+    public func validate(docType: String, options: MsoValidationOptions = .init()) throws(MsoValidationError) {
         // Perform validation logic here
         let msoValidationRules: [(MobileSecurityObject) -> [MsoValidationError]?] =
             [
                 { if $0.docType == docType { nil } else { [.docTypeNotMatches($0.docType)] } },
                 { if DigestAlgorithmKind(rawValue: $0.digestAlgorithm) != nil { nil } else { [.unsupportedDigestAlgorithm($0.digestAlgorithm)] } },
                 { validateDigestValues(mso: $0) },
-                { validateValidityInfo(mso: $0) },
+                { validateValidityInfo(mso: $0, options: options) },
                 { _ in validateMsoSignature() },
             ]
         let errors: [MsoValidationError] = msoValidationRules.compactMap { $0(issuerAuth.mso) }.flatMap { $0 }
@@ -54,13 +62,17 @@ extension IssuerSigned {
         return if errorList.isEmpty {nil } else { errorList }
     }
 
-    func validateValidityInfo(mso: MobileSecurityObject) -> [MsoValidationError]? {
+    func validateValidityInfo(mso: MobileSecurityObject, options: MsoValidationOptions = .init()) -> [MsoValidationError]? {
         guard !issuerAuth.x5chain.isEmpty, let dsCert = try? X509.Certificate(derEncoded: issuerAuth.x5chain[0]) else { return [.signatureVerificationFailed("No issuer certificates provided in x5chain")] }
         guard let sd = mso.validityInfo.signed.convertToLocalDate(), let vf = mso.validityInfo.validFrom.convertToLocalDate(), let vu = mso.validityInfo.validUntil.convertToLocalDate() else { return [.validityInfo("MSO validity contains invalid strings")]}
         var errorList: [MsoValidationError] = []
         if !(sd >= dsCert.notValidBefore && sd <= dsCert.notValidAfter) { errorList.append(.validityInfo("The 'signed' date is not within the validity period of the certificate in the MSO: \(sd.formatted()) (\(dsCert.notValidBefore.formatted()) - \(dsCert.notValidAfter.formatted()))")) }
-		if !(vf <= .now.addingTimeInterval(60) && vf <= vu) { errorList.append(.validityInfo("Current timestamp is not equal or later than the ‘validFrom’ element: \(vf.formatted())")) }
-		if !(vu >= .now) { errorList.append(.validityInfo("Current timestamp is not less than the ‘validUntil’ element: \(vu.formatted())")) }
+		if !(vf <= .now.addingTimeInterval(60)) { errorList.append(.validityInfo("Current timestamp is not equal or later than the ‘validFrom’ element: \(vf.formatted())")) }
+		if !(vf < vu) { errorList.append(.validityInfo("The ‘validFrom’ element must be strictly earlier than the ‘validUntil’ element: \(vf.formatted()) >= \(vu.formatted())")) }
+        if !(vu.addingTimeInterval(60) >= .now) { errorList.append(.validityInfo("Current timestamp is not less than the ‘validUntil’ element: \(vu.formatted())")) }
+        if options.rejectIfValidUntilExceedsCertificateValidity && vu > dsCert.notValidAfter {
+            errorList.append(.validityInfo("The ‘validUntil’ element exceeds certificate validity: \(vu.formatted()) > \(dsCert.notValidAfter.formatted())"))
+        }
         return errorList.isEmpty ? nil : errorList
     }
 
