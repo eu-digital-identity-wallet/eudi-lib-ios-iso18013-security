@@ -105,7 +105,6 @@ public struct SessionEncryption: Sendable {
 
 	/// Session keys are derived using ECKA-DH (Elliptic Curve Key Agreement Algorithm – Diffie-Hellman) as defined in BSI TR-03111
 	mutating func makeKeyAgreementAndDeriveSessionKey(isEncrypt: Bool) async throws -> SymmetricKey  {
-        if sessionKeys.privateKey.privateKeyId == nil { try await sessionKeys.privateKey.makeKey(curve: type(of: sessionKeys.privateKey.secureArea).defaultEcCurve) }
 		let sharedKey = try await sessionKeys.makeEckaDHAgreement()
 		let symmetricKey = try Self.HMACKeyDerivationFunction(sharedSecret: sharedKey, salt: sessionTranscriptBytes, info: getInfo(isEncrypt: isEncrypt).data(using: .utf8)!)
 		return symmetricKey
