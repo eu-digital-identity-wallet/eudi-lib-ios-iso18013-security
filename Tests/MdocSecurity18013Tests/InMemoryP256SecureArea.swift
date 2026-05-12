@@ -95,12 +95,12 @@ public actor DummySecureKeyStorage: MdocDataModel18013.SecureKeyStorage {
 
 extension MdocDataModel18013.CoseKeyPrivate {
   // decode cbor string
-    public init?(p256data base64: String) {
+      public init?(p256data base64: String) {
         guard let d = Data(base64Encoded: base64), let obj = try? CBOR.decode([UInt8](d)), let coseKey = try? CoseKey(cbor: obj), let cd = obj[-4], case let CBOR.byteString(rd) = cd else { return nil }
         let keyData = NSMutableData(bytes: [0x04], length: [0x04].count)
-        keyData.append(Data(coseKey.x)); keyData.append(Data(coseKey.y)); keyData.append(Data(rd))
+        keyData.append(Data(coseKey.x)); keyData.append(Data(coseKey.y));  keyData.append(Data(rd))
         let sampleSA = InMemoryP256SecureArea(storage: DummySecureKeyStorage(), x963Key: keyData as Data)
-        self.init(secureArea: sampleSA)
+        self.init(privateKeyId: UUID().uuidString, index: 0, secureArea: sampleSA, curve: .P256)
     }
 
     /// Create a COSE_Key from Elliptic Curve paramters of the private key.
@@ -113,7 +113,6 @@ extension MdocDataModel18013.CoseKeyPrivate {
         let keyData = NSMutableData(bytes: [0x04], length: [0x04].count)
         keyData.append(Data(x)); keyData.append(Data(y)); keyData.append(Data(d))
         let sampleSA = InMemoryP256SecureArea(storage: DummySecureKeyStorage(), x963Key: keyData as Data)
-        self.init(secureArea: sampleSA)
-        self.key = CoseKey(x: x, y: y, crv: crv)
+        self.init(privateKeyId: UUID().uuidString, index: 0, secureArea: sampleSA, curve: .P256)
     }
 }
