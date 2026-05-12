@@ -28,6 +28,7 @@ public actor InMemoryP256SecureArea: SecureArea {
     init(storage: any MdocDataModel18013.SecureKeyStorage, x963Key: Data? = nil) {
         self.storage = storage
         self.x963Key = x963Key
+        key = if let x963Key { try! P256.Signing.PrivateKey(x963Representation: x963Key) } else { P256.Signing.PrivateKey() }
     }
 
     /// Sets the x963 key representation for use in key creation.
@@ -42,7 +43,7 @@ public actor InMemoryP256SecureArea: SecureArea {
 
     public func getStorage() async -> any MdocDataModel18013.SecureKeyStorage { storage }
 
-    public func createKey(id: String, index: Int, keyOptions: MdocDataModel18013.KeyOptions?) async throws -> MdocDataModel18013.CoseKey {
+    public func createKey(id: String, index: Int, keyOptions: MdocDataModel18013.KeyOptions?) throws -> MdocDataModel18013.CoseKey {
         key = if let x963Key { try P256.Signing.PrivateKey(x963Representation: x963Key) } else { P256.Signing.PrivateKey() }
         guard SecKeyCreateWithData(key.x963Representation as NSData, [kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom, kSecAttrKeyClass: kSecAttrKeyClassPrivate] as NSDictionary, nil) != nil else {  throw NSError(domain: "", code: 0, userInfo: [NSLocalizedDescriptionKey : "Error creating private key"])  }
         return CoseKey(crv: .P256, x963Representation: key.publicKey.x963Representation)
