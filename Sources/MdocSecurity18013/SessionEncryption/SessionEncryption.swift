@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023 European Commission
+Copyright (c) 2026 European Commission
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -65,7 +65,7 @@ public struct SessionEncryption: Sendable {
 		var dataNonce = Data()
 		let identifier = isEncrypt ? encryptionIdentifier : decryptionIdentifier
 		dataNonce.append(Data(identifier))
-		dataNonce.append(Data(counter.byteArrayLittleEndian))
+		dataNonce.append(Data(counter.byteArrayBigEndian))
 		let nonce = try AES.GCM.Nonce(data: dataNonce)
 		return nonce
 	}
@@ -105,7 +105,6 @@ public struct SessionEncryption: Sendable {
 
 	/// Session keys are derived using ECKA-DH (Elliptic Curve Key Agreement Algorithm – Diffie-Hellman) as defined in BSI TR-03111
 	mutating func makeKeyAgreementAndDeriveSessionKey(isEncrypt: Bool) async throws -> SymmetricKey  {
-        if sessionKeys.privateKey.privateKeyId == nil { try await sessionKeys.privateKey.makeKey(curve: type(of: sessionKeys.privateKey.secureArea).defaultEcCurve) }
 		let sharedKey = try await sessionKeys.makeEckaDHAgreement()
 		let symmetricKey = try Self.HMACKeyDerivationFunction(sharedSecret: sharedKey, salt: sessionTranscriptBytes, info: getInfo(isEncrypt: isEncrypt).data(using: .utf8)!)
 		return symmetricKey

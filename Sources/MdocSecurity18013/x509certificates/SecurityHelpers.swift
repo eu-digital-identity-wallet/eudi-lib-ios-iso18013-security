@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023 European Commission
+Copyright (c) 2026 European Commission
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -63,10 +63,10 @@ public class SecurityHelpers {
 		guard !x509cert.subject.isEmpty, let cn = getCommonName(ref: secCert), !cn.isEmpty else { return (false, ["Missing Common Name of Reader Certificate"], nil) }
 		guard !x509cert.signature.description.isEmpty else { return (false, ["Missing Signature data"], nil) }
 		if x509cert.serialNumber.description.isEmpty { messages.append("Missing Serial number") }
-		// not critical errors below
-		if x509cert.hasDuplicateExtensions() { messages.append("Duplicate extensions in Certificate") }
+		guard !x509cert.hasDuplicateExtensions() else { return (false, ["Duplicate extensions in Certificate"], nil) }
 		if usage == .mdocReaderAuth {
-			verifyReaderAuthCert(x509cert, messages: &messages)
+			let (isValidExt, extError) = verifyReaderAuthCert(x509cert, messages: &messages)
+			if !isValidExt { return (false, [extError ?? "Certificate extension validation failed"], nil) }
 			if let gns = x509cert.getSubjectAlternativeNames(), let gn = gns.first(where: { switch $0 { case .rfc822Name(_): true; case .uniformResourceIdentifier(_): true;  default: false } }) { logger.info("Alternative name \(gn.description)")}
 		}
 		SecTrustSetPolicies(trust, policy)
@@ -82,7 +82,7 @@ public class SecurityHelpers {
 				if usage == .mdocReaderAuth, let rootGns = x509root.getSubjectAlternativeNames(), let gns = x509cert.getSubjectAlternativeNames() {
 					guard gns.elementsEqual(rootGns) else { return (false, ["Issuer data rfc822Name or uniformResourceIdentifier do not match with root cert."], nil) }
 				}
-				let bs = fetchCRLSerialNumbers(x509root)
+				let bs = fetchCRLSerialNumbers(x509root, messages: &messages)
 				if !bs.isEmpty {
 					if bs.contains(x509cert.serialNumber) { return (false, ["Revoked issued Certificate"], rootCert)}
 					if bs.contains(x509root.serialNumber) { return (false,["Revoked Root Certificate"], rootCert)}
@@ -100,7 +100,7 @@ public class SecurityHelpers {
 		//if let error { logger.error("Error evaluating trust: \(error)") }
         return (isValid, error?.localizedDescription, (error as? NSError)?.code)
 	}
-    
+
     public static func isChainFound(secCerts: x5chain, rootIaca: [x5chain]) async -> (isValid: Bool, validationMessages: [String], rootCert: SecCertificate?) {
         var validationMessages: [String] = []
         guard let leafSecCert = secCerts.first, let leafCert = try? leafSecCert.certificate() else {
@@ -136,20 +136,39 @@ public class SecurityHelpers {
     }
   }
 
- public static func fetchCRLSerialNumbers(_ x509root: X509.Certificate) -> [Certificate.SerialNumber] {
-		var res = [Certificate.SerialNumber]()
+ public static func fetchCRLSerialNumbers(_ x509root: X509.Certificate, messages: inout [String]) -> [Certificate.SerialNumber] {
+		var bs = [Certificate.SerialNumber]()
 		if let ext = x509root.extensions[oid: .X509ExtensionID.cRLDistributionPoints], let crlDistr = try? CRLDistributions(derEncoded: ext.value) {
 			for crl in crlDistr.crls {
 				guard let crlUrl = URL(string: crl.distributionPoint) else { continue }
-				guard let pem = try? String(contentsOf: crlUrl) else { continue }
-				guard let crl = try? CRL(pemEncoded: pem) else { continue }
-				res.append(contentsOf: crl.revokedSerials.map(\.serial))
+				guard let crlData = try? Data(contentsOf: crlUrl) else { continue }
+				let crl: CRL
+				if let pemString = String(data: crlData, encoding: .utf8), pemString.contains("-----BEGIN") {
+					guard let pemCrl = try? CRL(pemEncoded: pemString) else { continue }
+					crl = pemCrl
+				} else {
+					guard let derCrl = try? CRL(derEncoded: Array(crlData)) else { continue }
+					crl = derCrl
+				}
+				guard crl.isValid else {
+					let errorMessage = "CRL from \(crlUrl) is not within its validity period (thisUpdate: \(crl.thisUpdate), nextUpdate: \(crl.nextUpdate))"
+					messages.append(errorMessage)
+					continue
+				}
+				guard crl.verifySignature(issuer: x509root) else {
+					messages.append("CRL from \(crlUrl) has an invalid signature")
+					continue
+				}
+				bs.append(contentsOf: crl.revokedSerials.map(\.serial))
 			}
 		}
-		return res
+		return bs
 	}
 
-	public static func verifyReaderAuthCert(_ x509: X509.Certificate, messages: inout [String]) {
+	/// Verify reader auth certificate extensions and properties.
+	/// - Returns: A tuple of (isValid, errorMessage). If isValid is false, validation must fail.
+	@discardableResult
+	public static func verifyReaderAuthCert(_ x509: X509.Certificate, messages: inout [String]) -> (Bool, String?) {
 		// check issuer
 		if !x509.issuer.isEmpty { logger.info("Issuer \(x509.issuer.description)")} else { messages.append("Missing Issuer") }
 		// check authority key identifier
@@ -169,12 +188,13 @@ public class SecurityHelpers {
 		// display extended OCSP extension
 		if let ext_ocsp = try? x509.extensions.authorityInformationAccess, let infoAccesses = ext_ocsp.infoAccesses, let infoAccess = infoAccesses.first, infoAccess.method == .ocspServer, !infoAccess.location.description.isEmpty { logger.info("OCSP server location: \(infoAccess.location.description)") }
 		if x509.signatureAlgorithm.isECDSA256or384or512 { logger.info("Signature algorithm is \(x509.signatureAlgorithm)")} else { messages.append("Signature algorithm must be ECDSA with SHA 256/384/512") }
-		// check for not allowed critical extensions
+		// check for not allowed critical extensions — must cause validation failure per RFC 5280 Section 4.2
 		let criticalExtensionOIDs: [String] = x509.extensions.filter(\.critical).map(\.oid).map(\.description)
 		let notAllowedCriticalExt = Set(criticalExtensionOIDs).intersection(Set(Self.nonAllowedExtensions))
-		if notAllowedCriticalExt.isEmpty { logger.info("Critical extensions correct") } else { messages.append("Not allowed critical extensions \(notAllowedCriticalExt)") }
+		if notAllowedCriticalExt.isEmpty { logger.info("Critical extensions correct") } else { return (false, "Not allowed critical extensions \(notAllowedCriticalExt)") }
 		// check crls existing
 		if let crlExt1 = x509.extensions[oid: .X509ExtensionID.cRLDistributionPoints], let crlExt2 = try? CRLDistributionPointsExtension(crlExt1), !crlExt2.crls.isEmpty, crlExt2.crls.allSatisfy(\.isNotEmpty) { logger.info("CRL Distribution extension found") } else { messages.append("Missing CRL Distribution extension") }
+		return (true, nil)
 	}
 
 	public static func getCommonName(ref: SecCertificate) -> String? {

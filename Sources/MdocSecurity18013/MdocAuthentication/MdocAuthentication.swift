@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023 European Commission
+Copyright (c) 2026 European Commission
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,12 +29,11 @@ import SwiftCBOR
 /// let mdocAuth = MdocAuthentication(transcript: sessionEncr.transcript, authKeys: authKeys)
 /// ```
 public struct MdocAuthentication: Sendable {
-    // The session transcript object, can be a `SessionTranscript` or any other object that conforms to`CBOREncodable`
-    let sessionTranscript: CBOREncodable & Sendable
+    let sessionTranscript: SessionTranscript
     let authKeys: CoseKeyExchange
     var sessionTranscriptBytes: [UInt8] { sessionTranscript.toCBOR(options: CBOROptions()).taggedEncoded.encode(options: CBOROptions()) }
 
-	public init(sessionTranscript: CBOREncodable & Sendable, authKeys: CoseKeyExchange) {
+	public init(sessionTranscript: SessionTranscript, authKeys: CoseKeyExchange) {
 		self.sessionTranscript = sessionTranscript
 		self.authKeys = authKeys
 	}

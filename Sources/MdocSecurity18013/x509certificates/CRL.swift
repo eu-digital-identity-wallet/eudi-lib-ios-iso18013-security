@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023 European Commission
+Copyright (c) 2026 European Commission
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,11 +19,14 @@ import SwiftASN1
 import X509
 
 struct CRL: PEMParseable, DERParseable {
-	var serialNumber: Int64
+	var version: Int64
 	var issuer: DistinguishedName
-	var validity: UTCTime
-	var subject: UTCTime
+	var thisUpdate: UTCTime
+	var nextUpdate: UTCTime
 	var revokedSerials: [CRLSerialInfo] = []
+	var tbsBytes: ArraySlice<UInt8>
+	var signatureAlgorithmOID: ASN1ObjectIdentifier
+	var signatureBitBytes: ArraySlice<UInt8>
 	static let defaultPEMDiscriminator: String = "X509 CRL"
 
 	struct CRLSerialInfo: DERImplicitlyTaggable, CustomStringConvertible {
@@ -45,18 +48,64 @@ struct CRL: PEMParseable, DERParseable {
 	init(derEncoded node: SwiftASN1.ASN1Node) throws {
 		guard case .constructed(let nodes) = node.content else { throw Self.toError(node: node) }
 		var nodesIter = nodes.makeIterator()
-		guard let n1 = nodesIter.next() else { throw Self.toError(node: node) } // tbsCertificate
-		guard case .constructed(let nodes1) = n1.content else { throw Self.toError(node: n1) }
+		guard let tbsCertListNode = nodesIter.next() else { throw Self.toError(node: node) } // tbsCertList
+		tbsBytes = tbsCertListNode.encodedBytes
+		// Parse signatureAlgorithm (SEQUENCE { OID, optional params })
+		guard let sigAlgNode = nodesIter.next() else { throw Self.toError(node: node) }
+		guard case .constructed(let sigAlgNodes) = sigAlgNode.content else { throw Self.toError(node: sigAlgNode) }
+		var sigAlgIter = sigAlgNodes.makeIterator()
+		signatureAlgorithmOID = try ASN1ObjectIdentifier(derEncoded: &sigAlgIter)
+		// Parse signatureValue (BIT STRING)
+		let sigBitString = try ASN1BitString(derEncoded: &nodesIter)
+		signatureBitBytes = sigBitString.bytes[...]
+		// Parse tbsCertList fields
+		guard case .constructed(let nodes1) = tbsCertListNode.content else { throw Self.toError(node: tbsCertListNode) }
 		var nodes1Iter = nodes1.makeIterator()
-		serialNumber = try Int64(derEncoded: &nodes1Iter)
-		_ = nodes1Iter.next() // skip signature
-		guard let issuerNode = nodes1Iter.next() else { throw Self.toError(node: n1) }
+		version = try Int64(derEncoded: &nodes1Iter)
+		_ = nodes1Iter.next() // skip signature algorithm (repeated in tbsCertList)
+		guard let issuerNode = nodes1Iter.next() else { throw Self.toError(node: tbsCertListNode) }
 		issuer = try DistinguishedName(derEncoded: issuerNode)
-		validity = try SwiftASN1.UTCTime(derEncoded: &nodes1Iter)
-		subject = try SwiftASN1.UTCTime(derEncoded: &nodes1Iter)
-		guard let n2 = nodes1Iter.next() else { throw Self.toError(node: n1) } // subject public key info
-		guard case .constructed(let nodes3) = n2.content else { throw Self.toError(node: n2) }
-		revokedSerials = nodes3.compactMap { try? CRLSerialInfo(derEncoded: $0) }
+		thisUpdate = try SwiftASN1.UTCTime(derEncoded: &nodes1Iter)
+		nextUpdate = try SwiftASN1.UTCTime(derEncoded: &nodes1Iter)
+		// revokedCertificates is OPTIONAL; the next node may be extensions ([0] EXPLICIT) or absent
+		if let n2 = nodes1Iter.next(), n2.identifier == .sequence, case .constructed(let nodes3) = n2.content {
+			revokedSerials = try nodes3.map { try CRLSerialInfo(derEncoded: $0) }
+		}
+	}
+
+	// OID constants for signature algorithms not publicly exposed by swift-asn1
+	private static let oidEcdsaWithSHA256: ASN1ObjectIdentifier = [1, 2, 840, 10045, 4, 3, 2]
+	private static let oidEcdsaWithSHA384: ASN1ObjectIdentifier = [1, 2, 840, 10045, 4, 3, 3]
+	private static let oidEcdsaWithSHA512: ASN1ObjectIdentifier = [1, 2, 840, 10045, 4, 3, 4]
+	private static let oidSha1WithRSAEncryption: ASN1ObjectIdentifier = [1, 2, 840, 113549, 1, 1, 5]
+	private static let oidEd25519: ASN1ObjectIdentifier = [1, 3, 101, 112]
+
+	/// Map the CRL's signature algorithm OID to the corresponding `Certificate.SignatureAlgorithm`.
+	var signatureAlgorithm: Certificate.SignatureAlgorithm? {
+		switch signatureAlgorithmOID {
+		case Self.oidEcdsaWithSHA256: return .ecdsaWithSHA256
+		case Self.oidEcdsaWithSHA384: return .ecdsaWithSHA384
+		case Self.oidEcdsaWithSHA512: return .ecdsaWithSHA512
+		case .AlgorithmIdentifier.sha256WithRSAEncryption: return .sha256WithRSAEncryption
+		case .AlgorithmIdentifier.sha384WithRSAEncryption: return .sha384WithRSAEncryption
+		case .AlgorithmIdentifier.sha512WithRSAEncryption: return .sha512WithRSAEncryption
+		case Self.oidSha1WithRSAEncryption: return .sha1WithRSAEncryption
+		case Self.oidEd25519: return .ed25519
+		default: return nil
+		}
+	}
+
+	/// Verify the CRL signature against the issuing certificate's public key.
+	func verifySignature(issuer: X509.Certificate) -> Bool {
+		guard let sigAlg = signatureAlgorithm else { return false }
+		return issuer.publicKey.isValidSignature(signatureBitBytes, for: tbsBytes, signatureAlgorithm: sigAlg)
+	}
+
+	var isValid: Bool {
+		let c = Calendar.current
+		let dc = c.dateComponents(in: TimeZone(identifier: "UTC")!, from: Date())
+		guard let now = try? UTCTime(year: dc.year!, month: dc.month!, day: dc.day!, hours: dc.hour!, minutes: dc.minute!, seconds: dc.second!) else { return false }
+		return thisUpdate <= now && now <= nextUpdate
 	}
 
 	static func toError(node: SwiftASN1.ASN1Node) -> NSError {

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023 European Commission
+Copyright (c) 2026 European Commission
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import MdocDataModel18013
 /// This structure is not transfered, only computed
 /// The mDL calculates this ephemeral MAC by performing KDF(ECDH(mDL private key, reader ephemeral public key)) and the mDL reader calculates this ephemeral MAC by performing KDF(ECDH(mDL public key, reader ephemeral private key)).
   public struct DeviceAuthentication: Sendable {
-    let sessionTranscript: CBOREncodable & Sendable
+    let sessionTranscript: SessionTranscript
     let docType: String
     let deviceNameSpacesRawData: [UInt8]
   }

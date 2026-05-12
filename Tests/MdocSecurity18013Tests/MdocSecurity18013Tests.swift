@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023 European Commission
+Copyright (c) 2026 European Commission
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ limitations under the License.
 import Foundation
 import Testing
 import SwiftCBOR
+import Security
 
 @testable import MdocDataModel18013
 @testable import MdocSecurity18013
@@ -79,8 +80,9 @@ struct MdocSecurity18013Tests {
     @Test("Compute DeviceAuthenticationBytes and MacStructure from annex D.5.3")
     func computeDeviceAuthenticationBytesAndMacStructureAnnexD53() async throws {
         let (_,sessionEncr) = try #require(try makeSessionEncryptionFromAnnexData())
-        var authKeys = CoseKeyExchange(publicKey: Self.AnnexdTestData.d51_ephReaderKey.key, privateKey: Self.AnnexdTestData.d53_deviceKey)
-        if authKeys.privateKey.privateKeyId == nil { try await authKeys.privateKey.makeKey(curve: CoseEcCurve.P256) }
+        var ephReaderKey = Self.AnnexdTestData.d51_ephReaderKey
+        let key = try await ephReaderKey.key
+        let authKeys = CoseKeyExchange(publicKey: key, privateKey: Self.AnnexdTestData.d53_deviceKey)
         let mdocAuth = MdocAuthentication(sessionTranscript: sessionEncr.sessionTranscript, authKeys: authKeys)
         let da = DeviceAuthentication(sessionTranscript: mdocAuth.sessionTranscript, docType: "org.iso.18013.5.1.mDL", deviceNameSpacesRawData: [0xA0])
         #expect(Data(da.toCBOR(options: CBOROptions()).taggedEncoded.encode(options: CBOROptions())) == AnnexdTestData.d53_deviceAuthDeviceAuthenticationBytes)
@@ -92,8 +94,9 @@ struct MdocSecurity18013Tests {
     @Test("Compute deviceAuth CBOR data")
     func computeDeviceAuthCBORData() async throws {
         let (_,sessionEncr) = try #require(try makeSessionEncryptionFromAnnexData())
-        var authKeys = CoseKeyExchange(publicKey: Self.AnnexdTestData.d51_ephReaderKey.key, privateKey: Self.AnnexdTestData.d53_deviceKey)
-        if authKeys.privateKey.privateKeyId == nil { try await authKeys.privateKey.makeKey(curve: CoseEcCurve.P256) }
+        var ephReaderKey = Self.AnnexdTestData.d51_ephReaderKey
+        let key = try await ephReaderKey.key
+        let authKeys = CoseKeyExchange(publicKey: key, privateKey: Self.AnnexdTestData.d53_deviceKey)
         let mdocAuth = MdocAuthentication(sessionTranscript: sessionEncr.sessionTranscript, authKeys: authKeys)
 		let bUseDeviceSign = UserDefaults.standard.bool(forKey: "PreferDeviceSignature")
         let dAuthO = try await mdocAuth.getDeviceAuthForTransfer(docType: "org.iso.18013.5.1.mDL", deviceNameSpacesRawData: [0xA0],
@@ -110,7 +113,22 @@ struct MdocSecurity18013Tests {
 		for docR in dr.docRequests {
 			let mdocAuth = MdocReaderAuthentication(transcript: sessionEncr.sessionTranscript)
 			guard let readerAuthRawCBOR = docR.readerAuthRawCBOR else { continue }
-			let (b, message) = try mdocAuth.validateReaderAuth(readerAuthCBOR: readerAuthRawCBOR, readerAuthX5c: docR.readerCertificates, itemsRequestRawData: docR.itemsRequestRawData!)
+			let (b, message) = try mdocAuth.validateReaderAuth(readerAuthCBOR: readerAuthRawCBOR, readerAuthX5c: docR.readerCertificates, itemsRequestRawData: docR.itemsRequestRawData!, rootIaca: [])
+			#expect(!b, "Current date not in validity period of Certificate")
+            print(message ?? "")
+		}
+	}
+
+    @Test("Validate readerAuth certificate chain trust with root IACA from annex D.4.11")
+    func validateReaderAuthCertificateTrustedWithRootIacaAnnexD411() throws {
+		let (_,sessionEncr) = try #require(try makeSessionEncryptionFromAnnexData())
+        let dr = try DeviceRequest(data: AnnexdTestData.request_d411.bytes)
+        let rootCert = try #require(SecCertificateCreateWithData(nil, AnnexdTestData.d54_readerRoot as CFData))
+        let rootIaca: [x5chain] = [[rootCert]]
+		for docR in dr.docRequests {
+			let mdocAuth = MdocReaderAuthentication(transcript: sessionEncr.sessionTranscript)
+			guard let readerAuthRawCBOR = docR.readerAuthRawCBOR else { continue }
+			let (b, message) = try mdocAuth.validateReaderAuth(readerAuthCBOR: readerAuthRawCBOR, readerAuthX5c: docR.readerCertificates, itemsRequestRawData: docR.itemsRequestRawData!, rootIaca: rootIaca)
 			#expect(!b, "Current date not in validity period of Certificate")
             print(message ?? "")
 		}
