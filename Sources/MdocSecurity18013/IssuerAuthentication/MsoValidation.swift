@@ -20,26 +20,29 @@ import MdocDataModel18013
 import SwiftCBOR
 import X509
 
-public struct MsoValidationOptions: Sendable {
-    public let rejectIfValidUntilExceedsCertificateValidity: Bool
-
-    public init(rejectIfValidUntilExceedsCertificateValidity: Bool = false) {
-        self.rejectIfValidUntilExceedsCertificateValidity = rejectIfValidUntilExceedsCertificateValidity
-    }
-}
-
 extension IssuerSigned {
-    public func validate(docType: String, options: MsoValidationOptions = .init()) throws(MsoValidationError) {
+    public func validate(
+        docType: String,
+        rejectIfValidUntilExceedsCertificateValidity: Bool = false,
+        publicCoseKeys: inout [CoseKey]
+    ) throws(MsoValidationError) {
         // Perform validation logic here
         let msoValidationRules: [(MobileSecurityObject) -> [MsoValidationError]?] =
             [
                 { if $0.docType == docType { nil } else { [.docTypeNotMatches($0.docType)] } },
-                { if DigestAlgorithmKind(rawValue: $0.digestAlgorithm) != nil { nil } else { [.unsupportedDigestAlgorithm($0.digestAlgorithm)] } },
+                {
+                    if DigestAlgorithmKind(rawValue: $0.digestAlgorithm) != nil {
+                        nil
+                    } else {
+                        [.unsupportedDigestAlgorithm($0.digestAlgorithm)]
+                    }
+                },
                 { validateDigestValues(mso: $0) },
-                { validateValidityInfo(mso: $0, options: options) },
-                { _ in validateMsoSignature() },
+                { validateValidityInfo(mso: $0, rejectIfValidUntilExceedsCertificateValidity) },
             ]
-        let errors: [MsoValidationError] = msoValidationRules.compactMap { $0(issuerAuth.mso) }.flatMap { $0 }
+        var errors: [MsoValidationError] = msoValidationRules.compactMap { $0(issuerAuth.mso) }.flatMap { $0 }
+        let bindingKeyErrors = validateMsoSignature(publicCoseKeys: &publicCoseKeys)
+        if let bindingKeyErrors { errors.append(contentsOf: bindingKeyErrors)}
         if !errors.isEmpty {
             throw if errors.count == 1, let first = errors.first { first } else { .multipleErrors(errors) }
         }
@@ -62,40 +65,87 @@ extension IssuerSigned {
         return if errorList.isEmpty {nil } else { errorList }
     }
 
-    func validateValidityInfo(mso: MobileSecurityObject, options: MsoValidationOptions = .init()) -> [MsoValidationError]? {
-        guard !issuerAuth.x5chain.isEmpty, let dsCert = try? X509.Certificate(derEncoded: issuerAuth.x5chain[0]) else { return [.signatureVerificationFailed("No issuer certificates provided in x5chain")] }
-        guard let sd = mso.validityInfo.signed.convertToLocalDate(), let vf = mso.validityInfo.validFrom.convertToLocalDate(), let vu = mso.validityInfo.validUntil.convertToLocalDate() else { return [.validityInfo("MSO validity contains invalid strings")]}
+    func validateValidityInfo(
+        mso: MobileSecurityObject,
+        _ rejectIfValidUntilExceedsCertificateValidity: Bool = false
+    ) -> [MsoValidationError]? {
+        guard !issuerAuth.x5chain.isEmpty,
+              let dsCert = try? X509.Certificate(derEncoded: issuerAuth.x5chain[0]) else {
+            return [.signatureVerificationFailed("No issuer certificates provided in x5chain")]
+        }
+        guard let signedDate = mso.validityInfo.signed.convertToLocalDate(),
+              let validFromDate = mso.validityInfo.validFrom.convertToLocalDate(),
+              let validUntilDate = mso.validityInfo.validUntil.convertToLocalDate() else {
+            return [.validityInfo("MSO validity contains invalid strings")]
+        }
         var errorList: [MsoValidationError] = []
-        if !(sd >= dsCert.notValidBefore && sd <= dsCert.notValidAfter) { errorList.append(.validityInfo("The 'signed' date is not within the validity period of the certificate in the MSO: \(sd.formatted()) (\(dsCert.notValidBefore.formatted()) - \(dsCert.notValidAfter.formatted()))")) }
-		if !(vf <= .now.addingTimeInterval(60)) { errorList.append(.validityInfo("Current timestamp is not equal or later than the ‘validFrom’ element: \(vf.formatted())")) }
-		if !(vf < vu) { errorList.append(.validityInfo("The ‘validFrom’ element must be strictly earlier than the ‘validUntil’ element: \(vf.formatted()) >= \(vu.formatted())")) }
-        if !(vu.addingTimeInterval(60) >= .now) { errorList.append(.validityInfo("Current timestamp is not less than the ‘validUntil’ element: \(vu.formatted())")) }
-        if options.rejectIfValidUntilExceedsCertificateValidity && vu > dsCert.notValidAfter {
-            errorList.append(.validityInfo("The ‘validUntil’ element exceeds certificate validity: \(vu.formatted()) > \(dsCert.notValidAfter.formatted())"))
+        if !(signedDate >= dsCert.notValidBefore && signedDate <= dsCert.notValidAfter) {
+            let validityRange = "\(dsCert.notValidBefore.formatted()) - \(dsCert.notValidAfter.formatted())"
+            let signedDateIssue = "The 'signed' date is not within the validity period"
+            let message = "\(signedDateIssue) of the certificate in the MSO: "
+                + "\(signedDate.formatted()) (\(validityRange))"
+            errorList.append(.validityInfo(message))
+        }
+        if !(validFromDate <= .now.addingTimeInterval(60)) {
+            let validFromIssue = "Current timestamp is not equal or later than the ‘validFrom’ element"
+            let message = "\(validFromIssue): \(validFromDate.formatted())"
+            errorList.append(.validityInfo(message))
+        }
+        if !(validFromDate < validUntilDate) {
+            let orderIssue = "The ‘validFrom’ element must be strictly earlier than the ‘validUntil’ element"
+            let message = "\(orderIssue): \(validFromDate.formatted()) >= \(validUntilDate.formatted())"
+            errorList.append(.validityInfo(message))
+        }
+        if !(validUntilDate.addingTimeInterval(60) >= .now) {
+            let message = "Current timestamp is not less than the ‘validUntil’ element: \(validUntilDate.formatted())"
+            errorList.append(.validityInfo(message))
+        }
+        if rejectIfValidUntilExceedsCertificateValidity && validUntilDate > dsCert.notValidAfter {
+            let certificateOverflowIssue = "The ‘validUntil’ element exceeds certificate validity"
+            let certificateLimit = dsCert.notValidAfter.formatted()
+            let message = "\(certificateOverflowIssue): \(validUntilDate.formatted()) > \(certificateLimit)"
+            errorList.append(.validityInfo(message))
         }
         return errorList.isEmpty ? nil : errorList
     }
 
     // Verify the MSO signature using the ds certificate in x5chain
-    func validateMsoSignature() -> [MsoValidationError]? {
-        guard !issuerAuth.x5chain.isEmpty else { return [.signatureVerificationFailed("No issuer certificates provided in x5chain")] }
+    func validateMsoSignature(publicCoseKeys: inout [CoseKey]) -> [MsoValidationError]? {
+        guard !issuerAuth.x5chain.isEmpty else {
+            return [.signatureVerificationFailed("No issuer certificates provided in x5chain")]
+        }
         let chain = issuerAuth.x5chain.compactMap { try? X509.Certificate(derEncoded: $0) }
-        guard chain.count == issuerAuth.x5chain.count else { return [.signatureVerificationFailed("Invalid issuer certificate in x5chain")] }
-        // check all certificates are not iaca
-        for cert in chain {
-            if cert.issuer == cert.subject { return [.signatureVerificationFailed("Certificate in x5chain is a IACA certificate, expected end-entity certificate")] }
+        guard chain.count == issuerAuth.x5chain.count else {
+            return [.signatureVerificationFailed("Invalid issuer certificate in x5chain")]
         }
         // Get the first certificate from the chain (the issuer certificate)
         let dsCertData = Data(issuerAuth.x5chain[0])
         // Extract the public key from the certificate
-        guard let publicKey = SecurityHelpers.getPublicKeyx963(publicCertData: dsCertData) else {
+        guard let issuerPublicKey = SecurityHelpers.getPublicKeyx963(publicCertData: dsCertData) else {
             return [.signatureVerificationFailed("Failed to extract public key from issuer certificate")]
+        }
+        // If public COSE keys given to the issuer are provided in options,
+        // check if the device public key matches any of them.
+        let deviceKey = issuerAuth.mso.deviceKeyInfo.deviceKey.x963Representation
+        let publicCoseKeyData = publicCoseKeys.map(\.x963Representation)
+        let coseIndex = publicCoseKeyData.firstIndex(of: deviceKey)
+        if let coseIndex {
+            publicCoseKeys.remove(at: coseIndex)
+        } else {
+            return [
+                .signatureVerificationFailed(
+                    "Device key does not match any of the provided public COSE keys"
+                )
+            ]
         }
         // Create a COSE structure for validation
         let cose = Cose(type: .sign1, algorithm: issuerAuth.verifyAlgorithm.rawValue, signature: issuerAuth.signature)
         // Validate the signature
         do {
-            let isValid = try cose.validateDetachedCoseSign1(payloadData: Data(issuerAuth.msoRawData), publicKey_x963: publicKey)
+            let isValid = try cose.validateDetachedCoseSign1(
+                payloadData: Data(issuerAuth.msoRawData),
+                publicKey_x963: issuerPublicKey
+            )
             if !isValid { return [.signatureVerificationFailed("Issuer authentication signature validation failed")] }
         } catch {
             return [.signatureVerificationFailed("Signature validation error: \(error.localizedDescription)")]
