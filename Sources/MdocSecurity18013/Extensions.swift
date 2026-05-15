@@ -105,7 +105,10 @@ public struct CRLDistributions {
 }
 
 extension CRLDistributions: DERImplicitlyTaggable {
-	public func serialize(into coder: inout SwiftASN1.DER.Serializer, withIdentifier identifier: SwiftASN1.ASN1Identifier) throws { }	// not needed
+	public func serialize(
+		into coder: inout SwiftASN1.DER.Serializer,
+		withIdentifier identifier: SwiftASN1.ASN1Identifier
+	) throws { }	// not needed
 	
 	public static var defaultIdentifier: SwiftASN1.ASN1Identifier {	.sequence  }
 	
@@ -121,13 +124,24 @@ public struct CRLDistribution {
 }
 
 extension CRLDistribution: DERImplicitlyTaggable {
-	public func serialize(into coder: inout SwiftASN1.DER.Serializer, withIdentifier identifier: SwiftASN1.ASN1Identifier) throws { }	// not needed
+	public func serialize(
+		into coder: inout SwiftASN1.DER.Serializer,
+		withIdentifier identifier: SwiftASN1.ASN1Identifier
+	) throws { }	// not needed
 	
 	public static var defaultIdentifier: SwiftASN1.ASN1Identifier {	.sequence	}
 	
 	public init(derEncoded rootNode: ASN1Node, withIdentifier identifier: SwiftASN1.ASN1Identifier) throws {
 		self = try DER.sequence(rootNode, identifier: identifier) { nodes in
-			guard let n0 = nodes.next(), case let .constructed(n1c) = n0.content, let n1 = n1c.first(where: { _ in true }), case let .constructed(n2c) = n1.content, let n2 = n2c.first(where: { _ in true }), let gn = try? GeneralName(derEncoded: n2), case let .uniformResourceIdentifier(url) = gn else { return CRLDistribution(distributionPoint: "") }
+			guard let distributionPointNode = nodes.next(),
+				  case let .constructed(distributionPointChildren) = distributionPointNode.content,
+				  let firstDistributionChild = distributionPointChildren.first(where: { _ in true }),
+				  case let .constructed(generalNameChildren) = firstDistributionChild.content,
+				  let generalNameNode = generalNameChildren.first(where: { _ in true }),
+				  let generalName = try? GeneralName(derEncoded: generalNameNode),
+				  case let .uniformResourceIdentifier(url) = generalName else {
+				return CRLDistribution(distributionPoint: "")
+			}
 			return CRLDistribution(distributionPoint: url)
 		}
 	}

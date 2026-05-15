@@ -19,9 +19,12 @@ import CryptoKit
 import MdocDataModel18013
 import SwiftCBOR
 
-/// Session encryption uses standard ephemeral key ECDH to establish session keys for authenticated symmetric encryption.
+/// Session encryption uses standard ephemeral key ECDH to establish session
+/// keys for authenticated symmetric encryption.
 /// The ``SessionEncryption`` struct implements session encryption (for the mDoc currently)
-/// It is initialized from a) the session establishment data received from the mdoc reader, b) the device engagement data generated from the mdoc and c) the handover data.
+/// It is initialized from a) the session establishment data received from the
+/// mdoc reader, b) the device engagement data generated from the mdoc and c)
+/// the handover data.
 ///
 /// ```swift
 /// var se = SessionEncryption(se: sessionEstablishmentObject, de: deviceEngagementObject, handOver: handOverObject)
@@ -47,18 +50,30 @@ public struct SessionEncryption: Sendable {
 	public init?(se: SessionEstablishment, de: DeviceEngagement, handOver: CBOR) {
 		sessionRole = .mdoc
 		deviceEngagementRawData = de.qrCoded ?? de.encode(options: CBOROptions())
-		guard let pk = de.privateKey else { logger.error("Device engagement for mdoc must have the private key"); return nil}
-		guard let rkrd = se.eReaderKeyRawData else { logger.error("Reader key data not available"); return nil}
-		self.eReaderKeyRawData = rkrd
-		guard let ok = se.eReaderKey else { logger.error("Could not decode ereader key"); return nil}
-		sessionKeys = CoseKeyExchange(publicKey: ok, privateKey: pk)
+		guard let devicePrivateKey = de.privateKey else {
+			logger.error("Device engagement for mdoc must have the private key")
+			return nil
+		}
+		guard let readerKeyRawData = se.eReaderKeyRawData else {
+			logger.error("Reader key data not available")
+			return nil
+		}
+		self.eReaderKeyRawData = readerKeyRawData
+		guard let readerPublicKey = se.eReaderKey else {
+			logger.error("Could not decode ereader key")
+			return nil
+		}
+		sessionKeys = CoseKeyExchange(publicKey: readerPublicKey, privateKey: devicePrivateKey)
 		self.handOver = handOver
 	}
 
 	/// Make nonce function to initialize the encryption or decryption
 	///
 	/// - Parameters:
-	///   - counter: The message counter value shall be a 4-byte big-endian unsigned integer. For the first encryption with a session key, the message counter shall be set to 1. Before each following encryption with the same key, the message counter value shall be increased by 1
+	///   - counter: The message counter value shall be a 4-byte big-endian
+	///     unsigned integer. For the first encryption with a session key, the
+	///     message counter shall be set to 1. Before each following encryption
+	///     with the same key, the message counter value shall be increased by 1
 	///   - isEncrypt: is for encrypt?
 	/// - Returns: The IV (Initialization Vector) used for the encryption.
 	func makeNonce(_ counter: UInt32, isEncrypt: Bool) throws -> AES.GCM.Nonce {
@@ -72,7 +87,12 @@ public struct SessionEncryption: Sendable {
 
 	/// computation of HKDF symmetric key
 	static func HMACKeyDerivationFunction(sharedSecret: SharedSecret, salt: [UInt8], info: Data) throws -> SymmetricKey {
-		let symmetricKey = sharedSecret.hkdfDerivedSymmetricKey(using: SHA256.self, salt: salt, sharedInfo: info, outputByteCount: 32)
+		let symmetricKey = sharedSecret.hkdfDerivedSymmetricKey(
+			using: SHA256.self,
+			salt: salt,
+			sharedInfo: info,
+			outputByteCount: 32
+		)
 		return symmetricKey
 	}
 
@@ -80,7 +100,8 @@ public struct SessionEncryption: Sendable {
 	mutating public func encrypt(_ data: [UInt8]) async throws -> [UInt8]? {
 		let nonce = try makeNonce(sessionCounter, isEncrypt: true)
 		let symmetricKeyForEncrypt = try await makeKeyAgreementAndDeriveSessionKey(isEncrypt: true)
-        guard let encryptedContent = try AES.GCM.seal(data, using: symmetricKeyForEncrypt, nonce: nonce).combined else { return nil }
+		let sealedBox = try AES.GCM.seal(data, using: symmetricKeyForEncrypt, nonce: nonce)
+		guard let encryptedContent = sealedBox.combined else { return nil }
 		if sessionRole == .mdoc { sessionCounter += 1 }
 		return [UInt8](encryptedContent.dropFirst(12))
 	}
@@ -93,7 +114,13 @@ public struct SessionEncryption: Sendable {
 		let decryptedContent = try AES.GCM.open(sealedBox, using: symmetricKeyForDecrypt)
 		return [UInt8](decryptedContent)
 	}
-	public var sessionTranscript: SessionTranscript { SessionTranscript(devEngRawData: deviceEngagementRawData, eReaderRawData: eReaderKeyRawData, handOver: handOver) }
+	public var sessionTranscript: SessionTranscript {
+		SessionTranscript(
+			devEngRawData: deviceEngagementRawData,
+			eReaderRawData: eReaderKeyRawData,
+			handOver: handOver
+		)
+	}
 
 	/// SessionTranscript = [DeviceEngagementBytes,EReaderKeyBytes,Handover]
 	public var sessionTranscriptBytes: [UInt8] {
@@ -101,12 +128,23 @@ public struct SessionEncryption: Sendable {
 		return trCbor.encode(options: CBOROptions())
 	}
 
-	func getInfo(isEncrypt: Bool) -> String { isEncrypt ? (sessionRole == .mdoc ? "SKDevice" : "SKReader") : (sessionRole == .mdoc ? "SKReader" : "SKDevice") }
+	func getInfo(isEncrypt: Bool) -> String {
+		if isEncrypt {
+			return sessionRole == .mdoc ? "SKDevice" : "SKReader"
+		}
+		return sessionRole == .mdoc ? "SKReader" : "SKDevice"
+	}
 
-	/// Session keys are derived using ECKA-DH (Elliptic Curve Key Agreement Algorithm – Diffie-Hellman) as defined in BSI TR-03111
+	/// Session keys are derived using ECKA-DH (Elliptic Curve Key Agreement
+	/// Algorithm – Diffie-Hellman) as defined in BSI TR-03111
 	mutating func makeKeyAgreementAndDeriveSessionKey(isEncrypt: Bool) async throws -> SymmetricKey  {
 		let sharedKey = try await sessionKeys.makeEckaDHAgreement()
-		let symmetricKey = try Self.HMACKeyDerivationFunction(sharedSecret: sharedKey, salt: sessionTranscriptBytes, info: getInfo(isEncrypt: isEncrypt).data(using: .utf8)!)
+		let keyInfo = getInfo(isEncrypt: isEncrypt).data(using: .utf8)!
+		let symmetricKey = try Self.HMACKeyDerivationFunction(
+			sharedSecret: sharedKey,
+			salt: sessionTranscriptBytes,
+			info: keyInfo
+		)
 		return symmetricKey
 	}
 
