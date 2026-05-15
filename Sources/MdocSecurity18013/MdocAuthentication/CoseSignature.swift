@@ -28,36 +28,46 @@ extension Cose {
     public static func makeDetachedCoseSign1(payloadData: Data, deviceKey: CoseKeyPrivate, alg: Cose.VerifyAlgorithm, unlockData: Data?) async throws -> Cose {
 		let coseIn = Cose(type: .sign1, algorithm: alg.rawValue, payloadData: payloadData)
 		let dataToSign = coseIn.signatureStruct!
-        let signature = try await deviceKey.secureArea.signature(id: deviceKey.privateKeyId, index: deviceKey.index, algorithm: alg.signingAlgorithm, dataToSign: dataToSign, unlockData: unlockData)
+		let signature = try await deviceKey.secureArea.signature(
+			id: deviceKey.privateKeyId,
+			index: deviceKey.index,
+			algorithm: alg.signingAlgorithm,
+			dataToSign: dataToSign,
+			unlockData: unlockData
+		)
 		// return COSE_SIGN1 struct
         return Cose(type: .sign1, algorithm: alg.rawValue, signature: signature)
 	}
 
-	/// Validate (verify) a detached COSE-Sign1 structure according to https://datatracker.ietf.org/doc/html/rfc8152#section-4.4
+	/// Validate (verify) a detached COSE-Sign1 structure according to
+	/// https://datatracker.ietf.org/doc/html/rfc8152#section-4.4
 	/// - Parameters:
 	///   - payloadData: Payload data signed
 	///   - publicKey_x963: public key corresponding the private key used to sign the data
 	/// - Returns: True if validation of signature succeeds
 	public func validateDetachedCoseSign1(payloadData: Data, publicKey_x963: Data) throws -> Bool {
-		let b: Bool
+		let isValidSignature: Bool
 		guard type == .sign1 else { logger.error("Cose must have type sign1"); return false}
 		guard let verifyAlgorithm = verifyAlgorithm else { logger.error("Cose signature algorithm not found"); return false}
 		let coseWithPayload = Cose(other: self, payloadData: payloadData)
-		guard let signatureStruct = coseWithPayload.signatureStruct else { logger.error("Cose signature struct cannot be computed"); return false}
+		guard let signatureStruct = coseWithPayload.signatureStruct else {
+			logger.error("Cose signature struct cannot be computed")
+			return false
+		}
 		switch verifyAlgorithm {
 		case .es256:
 			let signingPubKey = try P256.Signing.PublicKey(x963Representation: publicKey_x963)
-			let ecdsa_signature = try P256.Signing.ECDSASignature(rawRepresentation: signature)
-			b = signingPubKey.isValidSignature(ecdsa_signature, for: signatureStruct)
+			let ecdsaSignature = try P256.Signing.ECDSASignature(rawRepresentation: signature)
+			isValidSignature = signingPubKey.isValidSignature(ecdsaSignature, for: signatureStruct)
 		case .es384:
 			let signingPubKey = try P384.Signing.PublicKey(x963Representation: publicKey_x963)
-			let ecdsa_signature = try P384.Signing.ECDSASignature(rawRepresentation: signature)
-			b = signingPubKey.isValidSignature(ecdsa_signature, for: signatureStruct)
+			let ecdsaSignature = try P384.Signing.ECDSASignature(rawRepresentation: signature)
+			isValidSignature = signingPubKey.isValidSignature(ecdsaSignature, for: signatureStruct)
 		case .es512:
 			let signingPubKey = try P521.Signing.PublicKey(x963Representation: publicKey_x963)
-			let ecdsa_signature = try P521.Signing.ECDSASignature(rawRepresentation: signature)
-			b = signingPubKey.isValidSignature(ecdsa_signature, for: signatureStruct)
+			let ecdsaSignature = try P521.Signing.ECDSASignature(rawRepresentation: signature)
+			isValidSignature = signingPubKey.isValidSignature(ecdsaSignature, for: signatureStruct)
 		}
-		return b
+		return isValidSignature
 	}
 }

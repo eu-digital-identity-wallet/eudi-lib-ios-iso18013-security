@@ -41,7 +41,10 @@ struct CRL: PEMParseable, DERParseable {
 		}
 
 		static let defaultIdentifier: SwiftASN1.ASN1Identifier = .sequence
-		func serialize(into coder: inout SwiftASN1.DER.Serializer, withIdentifier identifier: SwiftASN1.ASN1Identifier) throws { } // not used
+		func serialize(
+			into coder: inout SwiftASN1.DER.Serializer,
+			withIdentifier identifier: SwiftASN1.ASN1Identifier
+		) throws { } // not used
 		var description: String { serial.description }
 	}
 
@@ -104,7 +107,22 @@ struct CRL: PEMParseable, DERParseable {
 	var isValid: Bool {
 		let c = Calendar.current
 		let dc = c.dateComponents(in: TimeZone(identifier: "UTC")!, from: Date())
-		guard let now = try? UTCTime(year: dc.year!, month: dc.month!, day: dc.day!, hours: dc.hour!, minutes: dc.minute!, seconds: dc.second!) else { return false }
+		guard let year = dc.year,
+			  let month = dc.month,
+			  let day = dc.day,
+			  let hour = dc.hour,
+			  let minute = dc.minute,
+			  let second = dc.second else {
+			return false
+		}
+		guard let now = try? UTCTime(
+			year: year,
+			month: month,
+			day: day,
+			hours: hour,
+			minutes: minute,
+			seconds: second
+		) else { return false }
 		return thisUpdate <= now && now <= nextUpdate
 	}
 

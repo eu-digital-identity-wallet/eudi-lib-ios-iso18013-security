@@ -40,8 +40,18 @@ public struct SessionData: Sendable {
 extension SessionData: CBORDecodable {
 	public init(cbor: CBOR) throws(MdocValidationError) {
 		guard case let .map(values) = cbor else { throw .invalidCbor("SessionData must be a CBOR map") }
-		if case let .unsignedInt(s) = values[.utf8String(CodingKeys.status.rawValue)] { status = s } else { logger.info("SessionData: Missing status"); status = nil  }
-		if case let .byteString(bs) = values[.utf8String(CodingKeys.data.rawValue)] { data = bs } else { logger.error("SessionData: Missing data"); data = nil  }
+		if case let .unsignedInt(sessionStatus) = values[.utf8String(CodingKeys.status.rawValue)] {
+			status = sessionStatus
+		} else {
+			logger.info("SessionData: Missing status")
+			status = nil
+		}
+		if case let .byteString(cipherData) = values[.utf8String(CodingKeys.data.rawValue)] {
+			data = cipherData
+		} else {
+			logger.error("SessionData: Missing data")
+			data = nil
+		}
 	}
 }
 

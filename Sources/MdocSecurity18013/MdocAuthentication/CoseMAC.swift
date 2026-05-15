@@ -20,7 +20,9 @@ import MdocDataModel18013
 
 extension Cose {
 
-	/// Make an untagged COSE-Mac0 structure according to https://datatracker.ietf.org/doc/html/rfc8152#section-6.3 (How to Compute and Verify a MAC)
+	/// Make an untagged COSE-Mac0 structure according to
+	/// https://datatracker.ietf.org/doc/html/rfc8152#section-6.3
+	/// (How to Compute and Verify a MAC)
 	/// - Parameters:
 	///   - payloadData: The serialized content to be MACed
 	///   - key: ECDH-agreed key

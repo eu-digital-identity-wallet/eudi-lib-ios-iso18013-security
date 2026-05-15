@@ -21,7 +21,8 @@ import SwiftCBOR
 
 /// Implements mdoc authentication
 ///
-/// The security objective of mdoc authentication is to prevent cloning of the mdoc and to mitigate man in the middle attacks.
+/// The security objective of mdoc authentication is to prevent cloning of the
+/// mdoc and to mitigate man in the middle attacks.
 /// Currently the mdoc side is implemented (generation of device-auth)
 /// Initialized from the session transcript object, the device private key and the reader ephemeral public key
 ///
@@ -31,7 +32,11 @@ import SwiftCBOR
 public struct MdocAuthentication: Sendable {
     let sessionTranscript: SessionTranscript
     let authKeys: CoseKeyExchange
-    var sessionTranscriptBytes: [UInt8] { sessionTranscript.toCBOR(options: CBOROptions()).taggedEncoded.encode(options: CBOROptions()) }
+	var sessionTranscriptBytes: [UInt8] {
+		sessionTranscript.toCBOR(options: CBOROptions())
+			.taggedEncoded
+			.encode(options: CBOROptions())
+	}
 
 	public init(sessionTranscript: SessionTranscript, authKeys: CoseKeyExchange) {
 		self.sessionTranscript = sessionTranscript
@@ -39,10 +44,16 @@ public struct MdocAuthentication: Sendable {
 	}
 
 	/// Calculate the ephemeral MAC key, by performing ECKA-DH (Elliptic Curve Key Agreement Algorithm – Diffie-Hellman)
-	/// The inputs shall be the SDeviceKey.Priv and EReaderKey.Pub for the mdoc and EReaderKey.Priv and SDeviceKey.Pub for the mdoc reader.
+	/// The inputs shall be the SDeviceKey.Priv and EReaderKey.Pub for the mdoc
+	/// and EReaderKey.Priv and SDeviceKey.Pub for the mdoc reader.
     func makeMACKeyAggrementAndDeriveKey(deviceAuth: DeviceAuthentication) async throws -> SymmetricKey? {
 		let sharedKey = try await authKeys.makeEckaDHAgreement()
-		let symmetricKey = try SessionEncryption.HMACKeyDerivationFunction(sharedSecret: sharedKey, salt: sessionTranscriptBytes, info: "EMacKey".data(using: .utf8)!)
+		let emacInfo = "EMacKey".data(using: .utf8)!
+		let symmetricKey = try SessionEncryption.HMACKeyDerivationFunction(
+			sharedSecret: sharedKey,
+			salt: sessionTranscriptBytes,
+			info: emacInfo
+		)
 		return symmetricKey
 	}
 
@@ -52,17 +63,39 @@ public struct MdocAuthentication: Sendable {
 	///   - deviceNameSpacesRawData: device-name spaces raw data. Usually is a CBOR-encoded empty dictionary
 	///   - bUseDeviceSign: Specify true for device authentication (false is default)
 	/// - Returns: DeviceAuth instance
-    public func getDeviceAuthForTransfer(docType: String, deviceNameSpacesRawData: [UInt8] = [0xA0], dauthMethod: DeviceAuthMethod, unlockData: Data?) async throws -> DeviceAuth? {
-		let da = DeviceAuthentication(sessionTranscript: sessionTranscript, docType: docType, deviceNameSpacesRawData: deviceNameSpacesRawData)
-		let contentBytes = da.toCBOR(options: CBOROptions()).taggedEncoded.encode(options: CBOROptions())
-		let coseRes: Cose
+    public func getDeviceAuthForTransfer(
+        docType: String,
+        deviceNameSpacesRawData: [UInt8] = [0xA0],
+        dauthMethod: DeviceAuthMethod,
+        unlockData: Data?
+    ) async throws -> DeviceAuth? {
+		let deviceAuthentication = DeviceAuthentication(
+			sessionTranscript: sessionTranscript,
+			docType: docType,
+			deviceNameSpacesRawData: deviceNameSpacesRawData
+		)
+		let contentBytes = deviceAuthentication.toCBOR(options: CBOROptions())
+			.taggedEncoded
+			.encode(options: CBOROptions())
+		let detachedAuthCose: Cose
 		if dauthMethod == .deviceSignature {
-            coseRes = try await Cose.makeDetachedCoseSign1(payloadData: Data(contentBytes), deviceKey: authKeys.privateKey, alg: .es256, unlockData: unlockData)
+			detachedAuthCose = try await Cose.makeDetachedCoseSign1(
+				payloadData: Data(contentBytes),
+				deviceKey: authKeys.privateKey,
+				alg: .es256,
+				unlockData: unlockData
+			)
 		} else {
             // this is the preferred method
-            guard let symmetricKey = try await self.makeMACKeyAggrementAndDeriveKey(deviceAuth: da) else { return nil}
-            coseRes = Cose.makeDetachedCoseMac0(payloadData: Data(contentBytes), key: symmetricKey, alg: .hmac256)
+			guard let symmetricKey = try await self.makeMACKeyAggrementAndDeriveKey(deviceAuth: deviceAuthentication) else {
+				return nil
+			}
+			detachedAuthCose = Cose.makeDetachedCoseMac0(
+				payloadData: Data(contentBytes),
+				key: symmetricKey,
+				alg: .hmac256
+			)
 	    }
-		return DeviceAuth(coseMacOrSignature: coseRes)
+		return DeviceAuth(coseMacOrSignature: detachedAuthCose)
 	}
 }

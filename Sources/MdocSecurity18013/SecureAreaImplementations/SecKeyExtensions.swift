@@ -47,7 +47,15 @@ extension SecureEnclave.P256.KeyAgreement.PrivateKey {
 extension P256.Signing.PrivateKey {
 	func toSecKey() throws -> SecKey {
 		var error: Unmanaged<CFError>?
-		guard let privateKey = SecKeyCreateWithData(x963Representation as NSData, [kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom, kSecAttrKeyClass: kSecAttrKeyClassPrivate] as NSDictionary, &error) else {
+        let keyAttributes: NSDictionary = [
+            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecAttrKeyClass: kSecAttrKeyClassPrivate,
+        ]
+        guard let privateKey = SecKeyCreateWithData(
+            x963Representation as NSData,
+            keyAttributes,
+            &error
+        ) else {
 			throw error!.takeRetainedValue() as Error
 		}
 		return privateKey
@@ -57,7 +65,15 @@ extension P256.Signing.PrivateKey {
 extension P256.KeyAgreement.PrivateKey {
     public func toSecKey() throws -> SecKey {
         var error: Unmanaged<CFError>?
-        guard let privateKey = SecKeyCreateWithData(x963Representation as NSData, [kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom, kSecAttrKeyClass: kSecAttrKeyClassPrivate] as NSDictionary, &error) else {
+        let keyAttributes: NSDictionary = [
+            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecAttrKeyClass: kSecAttrKeyClassPrivate,
+        ]
+        guard let privateKey = SecKeyCreateWithData(
+            x963Representation as NSData,
+            keyAttributes,
+            &error
+        ) else {
             throw error!.takeRetainedValue() as Error
         }
         return privateKey
@@ -67,7 +83,15 @@ extension P256.KeyAgreement.PrivateKey {
 extension P384.Signing.PrivateKey {
     func toSecKey() throws -> SecKey {
         var error: Unmanaged<CFError>?
-        guard let privateKey = SecKeyCreateWithData(x963Representation as NSData, [kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom, kSecAttrKeyClass: kSecAttrKeyClassPrivate] as NSDictionary, &error) else {
+        let keyAttributes: NSDictionary = [
+            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecAttrKeyClass: kSecAttrKeyClassPrivate,
+        ]
+        guard let privateKey = SecKeyCreateWithData(
+            x963Representation as NSData,
+            keyAttributes,
+            &error
+        ) else {
             throw error!.takeRetainedValue() as Error
         }
         return privateKey
@@ -77,7 +101,15 @@ extension P384.Signing.PrivateKey {
 extension P521.Signing.PrivateKey {
     func toSecKey() throws -> SecKey {
         var error: Unmanaged<CFError>?
-        guard let privateKey = SecKeyCreateWithData(x963Representation as NSData, [kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom, kSecAttrKeyClass: kSecAttrKeyClassPrivate] as NSDictionary, &error) else {
+        let keyAttributes: NSDictionary = [
+            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecAttrKeyClass: kSecAttrKeyClassPrivate,
+        ]
+        guard let privateKey = SecKeyCreateWithData(
+            x963Representation as NSData,
+            keyAttributes,
+            &error
+        ) else {
             throw error!.takeRetainedValue() as Error
         }
         return privateKey
@@ -101,7 +133,12 @@ extension SecKey {
     
     public static func getExistingKey(type: KeyType, keyId: String) -> SecKey? {
         let tag = keyId.data(using: .utf8)!
-        let getQuery: [String: Any] = [kSecClass as String: kSecClassKey, kSecAttrApplicationTag as String: tag, kSecAttrKeyType as String: type.secAttrKeyTypeValue, kSecReturnRef as String: true]
+        let getQuery: [String: Any] = [
+            kSecClass as String: kSecClassKey,
+            kSecAttrApplicationTag as String: tag,
+            kSecAttrKeyType as String: type.secAttrKeyTypeValue,
+            kSecReturnRef as String: true,
+        ]
         var item: CFTypeRef?
         let status = SecItemCopyMatching(getQuery as CFDictionary, &item)
         guard status == errSecSuccess else { return nil }
@@ -111,7 +148,11 @@ extension SecKey {
     /// Creates a random key. if keyId is passed the key is saved
     /// Elliptic curve bits options are: 192, 256, 384, or 521.
     public static func createRandomKey(type: KeyType, bits: Int, keyId: String? = nil) throws -> SecKey {
-        var attributes: [String: Any] = [kSecAttrKeyType as String: type.secAttrKeyTypeValue, kSecAttrKeyClass as String: kSecAttrKeyClassPrivate, kSecAttrKeySizeInBits as String: NSNumber(integerLiteral: bits)]
+        var attributes: [String: Any] = [
+            kSecAttrKeyType as String: type.secAttrKeyTypeValue,
+            kSecAttrKeyClass as String: kSecAttrKeyClassPrivate,
+            kSecAttrKeySizeInBits as String: NSNumber(integerLiteral: bits),
+        ]
         if let keyId {
             let tag = keyId.data(using: .utf8)!
             attributes[kSecPrivateKeyAttrs as String] = [
@@ -121,14 +162,22 @@ extension SecKey {
             ]
         }
         var error: Unmanaged<CFError>?
-        guard let key = SecKeyCreateRandomKey(attributes as CFDictionary, &error) else { throw error!.takeRetainedValue() as Error }
+        guard let key = SecKeyCreateRandomKey(attributes as CFDictionary, &error) else {
+            throw error!.takeRetainedValue() as Error
+        }
         return key
     }
 
     /// Gets the public key from a key pair.
     public func publicKey() throws -> SecKey {
         let publicKeyO = SecKeyCopyPublicKey(self)
-        guard let publicKey = publicKeyO else { throw NSError(domain: "SecKey", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create public key"]) }
+        guard let publicKey = publicKeyO else {
+            throw NSError(
+                domain: "SecKey",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Failed to create public key"]
+            )
+        }
         return publicKey
     }
 
@@ -139,7 +188,13 @@ extension SecKey {
         var error: Unmanaged<CFError>?
         let dataO = SecKeyCopyExternalRepresentation(self, &error)
         if let error = error?.takeRetainedValue() { throw error }
-        guard let data = dataO else { throw NSError(domain: "SecKey", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create external representation"]) }
+        guard let data = dataO else {
+            throw NSError(
+                domain: "SecKey",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Failed to create external representation"]
+            )
+        }
         return data as Data
     }
 
@@ -150,7 +205,13 @@ extension SecKey {
         let ciphertextO = SecKeyCreateEncryptedData(self, algorithm,
             plaintext as CFData, &error)
         if let error = error?.takeRetainedValue() { throw error }
-        guard let ciphertext = ciphertextO else { throw NSError(domain: "SecKey", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create cipher text"]) }
+        guard let ciphertext = ciphertextO else {
+            throw NSError(
+                domain: "SecKey",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Failed to create cipher text"]
+            )
+        }
         return ciphertext as Data
     }
 
@@ -161,7 +222,13 @@ extension SecKey {
         let plaintextO = SecKeyCreateDecryptedData(self, algorithm,
             ciphertext as CFData, &error)
         if let error = error?.takeRetainedValue() { throw error }
-        guard let plaintext = plaintextO else { throw NSError(domain: "SecKey", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create plain text"]) }
+        guard let plaintext = plaintextO else {
+            throw NSError(
+                domain: "SecKey",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Failed to create plain text"]
+            )
+        }
         return plaintext as Data
     }
 }
