@@ -38,28 +38,56 @@ public actor SoftwareSecureArea: SecureArea {
 
     public func createKeyMaterial(ecCurve: CoseEcCurve) throws -> (x963Priv: Data, x963Pub: Data) {
         switch ecCurve {
-        case .P256: let key = P256.Signing.PrivateKey(compactRepresentable: false); return (key.x963Representation, key.publicKey.x963Representation)
-        case .P384: let key = P384.Signing.PrivateKey(compactRepresentable: false); return (key.x963Representation, key.publicKey.x963Representation)
-        case .P521: let key = P521.Signing.PrivateKey(compactRepresentable: false); return (key.x963Representation, key.publicKey.x963Representation)
+        case .P256:
+            let privateKey = P256.Signing.PrivateKey(compactRepresentable: false)
+            return (privateKey.x963Representation, privateKey.publicKey.x963Representation)
+        case .P384:
+            let privateKey = P384.Signing.PrivateKey(compactRepresentable: false)
+            return (privateKey.x963Representation, privateKey.publicKey.x963Representation)
+        case .P521:
+            let privateKey = P521.Signing.PrivateKey(compactRepresentable: false)
+            return (privateKey.x963Representation, privateKey.publicKey.x963Representation)
         default: throw SecureAreaError("Unsupported curve \(ecCurve)")
         }
     }
 
-    public func createKeyBatch(id: String, credentialOptions: CredentialOptions, keyOptions: KeyOptions?) async throws -> [CoseKey] {
+    public func createKeyBatch(
+        id: String,
+        credentialOptions: CredentialOptions,
+        keyOptions: KeyOptions?
+    ) async throws -> [CoseKey] {
         let ecCurve = keyOptions?.curve ?? .P256
         let batchSize = credentialOptions.batchSize
-        var res: [CoseKey] = []; res.reserveCapacity(batchSize)
-        var dicts = [[String: Data]](); dicts.reserveCapacity(batchSize)
+        var publicKeys: [CoseKey] = []
+        publicKeys.reserveCapacity(batchSize)
+        var privateKeyRecords = [[String: Data]]()
+        privateKeyRecords.reserveCapacity(batchSize)
         for _ in 0..<batchSize {
             let (x963Priv, x963Pub) = try createKeyMaterial(ecCurve: ecCurve)
-            dicts.append([kSecValueData as String: x963Priv])
-            res.append(CoseKey(crv: ecCurve, x963Representation: x963Pub))
+            privateKeyRecords.append([kSecValueData as String: x963Priv])
+            publicKeys.append(CoseKey(crv: ecCurve, x963Representation: x963Pub))
         }
-        let kbi = KeyBatchInfo(secureAreaName: Self.name, crv: ecCurve, usedCounts: Array(repeating: 0, count: batchSize), credentialPolicy: credentialOptions.credentialPolicy)
+        let initialUsageCounts = Array(repeating: 0, count: batchSize)
+        let kbi = KeyBatchInfo(
+            secureAreaName: Self.name,
+            crv: ecCurve,
+            usedCounts: initialUsageCounts,
+            credentialPolicy: credentialOptions.credentialPolicy
+        )
         guard let kbiData = kbi.toData() else { throw SecureAreaError("Failed to encode KeyBatchInfo") }
-        try await storage.writeKeyInfo(id: id, dict: [kSecValueData as String: kbiData, kSecAttrDescription as String: ecCurve.jwkName.data(using: .utf8)!])
-        try await storage.writeKeyDataBatch(id: id, startIndex: 0, dicts: dicts, keyOptions: keyOptions)
-        return res
+        let curveNameData = ecCurve.jwkName.data(using: .utf8)!
+        let keyInfoRecord: [String: Data] = [
+            kSecValueData as String: kbiData,
+            kSecAttrDescription as String: curveNameData,
+        ]
+        try await storage.writeKeyInfo(id: id, dict: keyInfoRecord)
+        try await storage.writeKeyDataBatch(
+            id: id,
+            startIndex: 0,
+            dicts: privateKeyRecords,
+            keyOptions: keyOptions
+        )
+        return publicKeys
     }
     
     public func getPublicKey(id: String, index: Int, curve: CoseEcCurve) async throws -> CoseKey {
@@ -85,7 +113,13 @@ public actor SoftwareSecureArea: SecureArea {
         try await storage.deleteKeyInfo(id: id)
     }
     /// compute signature
-    public func signature(id: String, index: Int, algorithm: SigningAlgorithm, dataToSign: Data, unlockData: Data?) async throws -> Data {
+    public func signature(
+        id: String,
+        index: Int,
+        algorithm: SigningAlgorithm,
+        dataToSign: Data,
+        unlockData: Data?
+    ) async throws -> Data {
         let x963Priv = try await getKeyData(id: id, index: index)
         switch algorithm {
         case .ES256:
@@ -108,23 +142,28 @@ public actor SoftwareSecureArea: SecureArea {
     }
 
     /// make shared secret with other public key
-    public func keyAgreement(id: String, index: Int, publicKey: CoseKey, unlockData: Data?) async throws -> SharedSecret {
+    public func keyAgreement(
+        id: String,
+        index: Int,
+        publicKey: CoseKey,
+        unlockData: Data?
+    ) async throws -> SharedSecret {
         let sharedSecret: SharedSecret
         let (_, curve) = try await getInfoAndCurve(id: id)
         let x963Priv = try await getKeyData(id: id, index: index)
         switch curve {
         case .P256:
-            let puk256 = try P256.KeyAgreement.PublicKey(x963Representation: publicKey.getx963Representation())
+            let puk256 = try P256.KeyAgreement.PublicKey(x963Representation: publicKey.x963Representation)
             let prk256 = try P256.KeyAgreement.PrivateKey(x963Representation: x963Priv)
             logger.info("Creating P256 key agreement for id: \(id), key index \(index)")
             sharedSecret = try prk256.sharedSecretFromKeyAgreement(with: puk256)
         case .P384:
-            let puk384 = try P384.KeyAgreement.PublicKey(x963Representation: publicKey.getx963Representation())
+            let puk384 = try P384.KeyAgreement.PublicKey(x963Representation: publicKey.x963Representation)
             let prk384 = try P384.KeyAgreement.PrivateKey(x963Representation: x963Priv)
             logger.info("Creating P384 key agreement for id: \(id), key index \(index)")
             sharedSecret = try prk384.sharedSecretFromKeyAgreement(with: puk384)
         case .P521:
-            let puk521 = try P521.KeyAgreement.PublicKey(x963Representation: publicKey.getx963Representation())
+            let puk521 = try P521.KeyAgreement.PublicKey(x963Representation: publicKey.x963Representation)
             let prk521 = try P521.KeyAgreement.PrivateKey(x963Representation: x963Priv)
             logger.info("Creating P521 key agreement for id: \(id), key index \(index)")
             sharedSecret = try prk521.sharedSecretFromKeyAgreement(with: puk521)
@@ -135,7 +174,9 @@ public actor SoftwareSecureArea: SecureArea {
 
     func getKeyData(id: String, index: Int) async throws -> Data {
         let keyDataDict = try await storage.readKeyData(id: id, index: index)
-        guard let x963Representation = keyDataDict[kSecValueData as String] else { throw SecureAreaError("Key data not found") }
+        guard let x963Representation = keyDataDict[kSecValueData as String] else {
+            throw SecureAreaError("Key data not found")
+        }
         return x963Representation
     }
 }

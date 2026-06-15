@@ -21,16 +21,22 @@ import MdocDataModel18013
 /// Implementes the intermediate structure for DeviceAuthentication
 ///
 /// This structure is not transfered, only computed
-/// The mDL calculates this ephemeral MAC by performing KDF(ECDH(mDL private key, reader ephemeral public key)) and the mDL reader calculates this ephemeral MAC by performing KDF(ECDH(mDL public key, reader ephemeral private key)).
+/// The mDL calculates this ephemeral MAC by performing KDF(ECDH(mDL private key,
+/// reader ephemeral public key)) and the mDL reader calculates this ephemeral
+/// MAC by performing KDF(ECDH(mDL public key, reader ephemeral private key)).
   public struct DeviceAuthentication: Sendable {
     let sessionTranscript: SessionTranscript
     let docType: String
-    let deviceNameSpacesRawData: [UInt8]
+    let deviceNameSpaces: DeviceNameSpaces?
   }
 
   extension DeviceAuthentication: CBOREncodable {
       public func toCBOR(options: CBOROptions) -> CBOR {
-          .array([.utf8String("DeviceAuthentication"), sessionTranscript.toCBOR(options: options), .utf8String(docType), deviceNameSpacesRawData.taggedEncoded])
+        let authenticationLabel = CBOR.utf8String("DeviceAuthentication")
+        let transcriptCbor = sessionTranscript.toCBOR(options: options)
+        let documentType = CBOR.utf8String(docType)
+        let nameSpaces = deviceNameSpaces != nil ? deviceNameSpaces.encode(options: options) : [0xA0]
+        return .array([authenticationLabel, transcriptCbor, documentType, nameSpaces.taggedEncoded])
       }
   }
 

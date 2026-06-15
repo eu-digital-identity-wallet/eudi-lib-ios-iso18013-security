@@ -23,7 +23,8 @@ import MdocDataModel18013
 import OrderedCollections
 
 /// The mdoc reader creates the session establishment message.Contains the reader key and the encrypted mdoc request.
-/// The mdoc uses the data from the session establishment message to derive the session keys and decrypt the mdoc request.
+/// The mdoc uses the data from the session establishment message to derive the
+/// session keys and decrypt the mdoc request.
 public struct SessionEstablishment: Sendable {
 	public var eReaderKeyRawData: [UInt8]?
 	public let data: [UInt8]
@@ -47,12 +48,20 @@ public struct SessionEstablishment: Sendable {
 extension SessionEstablishment: CBORDecodable {
 	public init(cbor: CBOR) throws(MdocValidationError) {
 		guard case let .map(m) = cbor else { throw .invalidCbor("SessionEstablishment must be a CBOR map") }
-		guard case let .byteString(bs) = m[.utf8String(CodingKeys.data.rawValue)] else { throw .missingField("SessionEstablishment", CodingKeys.data.rawValue) }
+		guard case let .byteString(bs) = m[.utf8String(CodingKeys.data.rawValue)] else {
+			throw .missingField("SessionEstablishment", CodingKeys.data.rawValue)
+		}
 		data = bs
 		if let eReaderKey = m[.utf8String(CodingKeys.eReaderKey.rawValue)] {
-			guard case let .tagged(tag, value) = eReaderKey else { throw .invalidCbor("SessionEstablishment eReaderKey must be tagged") }
-			guard tag == .encodedCBORDataItem else { throw .invalidCbor("SessionEstablishment eReaderKey tag must be encodedCBOR (24)") }
-			guard case let .byteString(ebs) = value else { throw .invalidCbor("SessionEstablishment eReaderKey value must be byteString") }
+			guard case let .tagged(tag, value) = eReaderKey else {
+				throw .invalidCbor("SessionEstablishment eReaderKey must be tagged")
+			}
+			guard tag == .encodedCBORDataItem else {
+				throw .invalidCbor("SessionEstablishment eReaderKey tag must be encodedCBOR (24)")
+			}
+			guard case let .byteString(ebs) = value else {
+				throw .invalidCbor("SessionEstablishment eReaderKey value must be byteString")
+			}
 			eReaderKeyRawData = ebs
 		} else { eReaderKeyRawData = nil }
 	}

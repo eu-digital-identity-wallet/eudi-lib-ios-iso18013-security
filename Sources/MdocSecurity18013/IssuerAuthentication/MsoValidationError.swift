@@ -33,13 +33,19 @@ public indirect enum MsoValidationError: LocalizedError, Sendable {
     public var errorDescription: String? {
         switch self {
         case .docTypeNotMatches(let docType):
-            return NSLocalizedString("The document type does not match the expected value '\(docType)' ", comment: "MsoValidationError")
+            let message = "The document type does not match the expected value '\(docType)' "
+            return NSLocalizedString(message, comment: "MsoValidationError")
         case .unsupportedDigestAlgorithm(let algorithm):
-            return NSLocalizedString("The digest algorithm \(algorithm) is not supported.", comment: "MsoValidationError")
+            let message = "The digest algorithm \(algorithm) is not supported."
+            return NSLocalizedString(message, comment: "MsoValidationError")
         case .missingDigestValues(let namespace, let elementIdentifiers):
-            return NSLocalizedString("The digest values are missing for namespace '\(namespace)' elements \(elementIdentifiers.joined(separator: ", "))", comment: "MsoValidationError")
+            let missingElements = elementIdentifiers.joined(separator: ", ")
+            let message = "The digest values are missing for namespace '\(namespace)' elements \(missingElements)"
+            return NSLocalizedString(message, comment: "MsoValidationError")
         case .invalidDigestValues(let namespace, let elementIdentifiers):
-            return NSLocalizedString("The digest values for namespace '\(namespace)' elements \(elementIdentifiers.joined(separator: ", ")) are invalid.", comment: "MsoValidationError")
+            let invalidElements = elementIdentifiers.joined(separator: ", ")
+            let message = "The digest values for namespace '\(namespace)' elements \(invalidElements) are invalid."
+            return NSLocalizedString(message, comment: "MsoValidationError")
         case .signatureVerificationFailed(let reason):
             return NSLocalizedString("The MSO signature verification failed: \(reason)", comment: "MsoValidationError")
         case .validityInfo(let reason):
@@ -47,7 +53,9 @@ public indirect enum MsoValidationError: LocalizedError, Sendable {
         case .issuerTrustFailed(let reason):
             return NSLocalizedString("MSO issuer trust check failed: \(reason)", comment: "MsoValidationError")
         case .multipleErrors(let errors):
-            return NSLocalizedString("Multiple MSO validation errors occurred: \(errors.map { $0.errorDescription ?? "" }.joined(separator: "; "))", comment: "MsoValidationError")
+            let joinedErrors = errors.map { $0.errorDescription ?? "" }.joined(separator: "; ")
+            let message = "Multiple MSO validation errors occurred: \(joinedErrors)"
+            return NSLocalizedString(message, comment: "MsoValidationError")
         }
     }
 }

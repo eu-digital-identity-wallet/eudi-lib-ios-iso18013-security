@@ -16,8 +16,6 @@ limitations under the License.
 
 /// The role for the session encryption object.
 public enum SessionRole: String, Sendable {
-	/// mdoc reader (verifier) role
-    case reader
 	/// mdoc (holder) role
     case mdoc
 }

@@ -38,7 +38,7 @@ Initialized from the session trascript object, the device private key and the re
  
 ```swift
 let mdocAuth = MdocAuthentication(transcript: sessionEncr.transcript, authKeys: authKeys)
-let deviceAuth = try mdocAuth.getDeviceAuthForTransfer(docType: "org.iso.18013.5.1.mDL", deviceNameSpacesRawData: [0xA0], bUseDeviceSign: bUseDeviceSign)!
+let deviceAuth = try mdocAuth.getDeviceAuthForTransfer(docType: "org.iso.18013.5.1.mDL", dauthMethod: bUseDeviceSign ? .deviceSignature : .deviceMac, deviceNameSpaces: nil, unlockData: nil)!
 let ourDeviceAuthCBORbytes = deviceAuth.encode(options: CBOROptions())
 ```
 

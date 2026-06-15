@@ -57,8 +57,10 @@ struct MsoValidationTests {
         let base64Data = try #require(Data(base64URLEncoded: strData))
 		let dr = try DeviceResponse(data: [UInt8](base64Data))
 		let iss = try #require(dr.documents?.first?.issuerSigned)
+        let deviceKey = iss.issuerAuth.mso.deviceKeyInfo.deviceKey
+        var publicCoseKeys = [deviceKey]
         do {
-            try iss.validate(docType: "eu.europa.ec.eudi.pid.1")
+            try iss.validate(docType: "eu.europa.ec.eudi.pid.1", publicCoseKeys: &publicCoseKeys)
         } catch {
             // Expected to fail due to missing/invalid certificates in x5chain
             switch error {
@@ -102,22 +104,18 @@ struct MsoValidationTests {
             expectedUpdate: mso.validityInfo.expectedUpdate
         )
         let issuerSignedOverflow = cloneIssuerSigned(issuerSigned, with: validityInfo)
-
-        let relaxedErrors = issuerSignedOverflow.validateValidityInfo(
-            mso: issuerSignedOverflow.issuerAuth.mso,
-            options: .init(rejectIfValidUntilExceedsCertificateValidity: false)
-        ) ?? []
+        var rejectIfValidUntilExceedsCertificateValidity = false
+        let relaxedErrors = try #require(issuerSignedOverflow.validateValidityInfo(
+            mso: issuerSignedOverflow.issuerAuth.mso, rejectIfValidUntilExceedsCertificateValidity))
         #expect(!relaxedErrors.contains(where: { error in
             if case .validityInfo(let reason) = error {
                 return reason.contains("exceeds certificate validity")
             }
             return false
         }))
-
-        let strictErrors = issuerSignedOverflow.validateValidityInfo(
-            mso: issuerSignedOverflow.issuerAuth.mso,
-            options: .init(rejectIfValidUntilExceedsCertificateValidity: true)
-        ) ?? []
+        rejectIfValidUntilExceedsCertificateValidity = true
+        let strictErrors = try #require(issuerSignedOverflow.validateValidityInfo(
+            mso: issuerSignedOverflow.issuerAuth.mso, rejectIfValidUntilExceedsCertificateValidity))
         #expect(strictErrors.contains(where: { error in
             if case .validityInfo(let reason) = error {
                 return reason.contains("exceeds certificate validity")
