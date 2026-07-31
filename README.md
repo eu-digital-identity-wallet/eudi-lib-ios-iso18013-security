@@ -49,7 +49,7 @@ Currently the mdoc side is implemented (verification of reader-auth CBOR data)
 ```swift
 let mdocAuth = MdocReaderAuthentication(transcript: sessionEncr.transcript)
 guard let readerAuthRawCBOR = docR.readerAuthRawCBOR else { continue }
-let b = try mdocAuth.validateReaderAuth(readerAuthCBOR: readerAuthRawCBOR, readerAuthCertificate: docR.readerCertificate!, itemsRequestRawData: docR.itemsRequestRawData!)
+let b = try await mdocAuth.validateReaderAuth(readerAuthCBOR: readerAuthRawCBOR, readerAuthX5c: docR.readerCertificates, itemsRequestRawData: docR.itemsRequestRawData!)
 ```
 
 ## Dependencies (to other libs)

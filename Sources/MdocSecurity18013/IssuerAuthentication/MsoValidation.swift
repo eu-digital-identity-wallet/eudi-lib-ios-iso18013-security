@@ -23,24 +23,26 @@ import X509
 extension IssuerSigned {
     public func validate(
         docType: String,
+        trustValidator: (any CertificateTrustValidator),
+        trustPolicy: TrustPolicy,
         rejectIfValidUntilExceedsCertificateValidity: Bool = false,
         publicCoseKeys: inout [CoseKey]
-    ) throws(MsoValidationError) {
+    ) async throws(MsoValidationError) {
         // Perform validation logic here
         let msoValidationRules: [(MobileSecurityObject) -> [MsoValidationError]?] =
             [
                 { if $0.docType == docType { nil } else { [.docTypeNotMatches($0.docType)] } },
-                {
-                    if DigestAlgorithmKind(rawValue: $0.digestAlgorithm) != nil {
-                        nil
-                    } else {
-                        [.unsupportedDigestAlgorithm($0.digestAlgorithm)]
-                    }
-                },
+                { if DigestAlgorithmKind(rawValue: $0.digestAlgorithm) != nil { nil } else { [.unsupportedDigestAlgorithm($0.digestAlgorithm)] } },
                 { validateDigestValues(mso: $0) },
-                { validateValidityInfo(mso: $0, rejectIfValidUntilExceedsCertificateValidity) },
             ]
         var errors: [MsoValidationError] = msoValidationRules.compactMap { $0(issuerAuth.mso) }.flatMap { $0 }
+        let dsCertificate = resolveDocumentSignerCertificate()
+        if let validityErrors = validateValidityInfo(mso: issuerAuth.mso, rejectIfValidUntilExceedsCertificateValidity, dsCertificate: dsCertificate) {
+            errors.append(contentsOf: validityErrors)
+        }
+        if let trustErrors = await validateIssuerTrust(trustValidator: trustValidator) {
+            if trustPolicy == .enforce { errors.append(contentsOf: trustErrors) }
+        }
         let bindingKeyErrors = validateMsoSignature(publicCoseKeys: &publicCoseKeys)
         if let bindingKeyErrors { errors.append(contentsOf: bindingKeyErrors)}
         if !errors.isEmpty {
@@ -65,12 +67,36 @@ extension IssuerSigned {
         return if errorList.isEmpty {nil } else { errorList }
     }
 
+    /// Resolves the document-signer certificate from the first certificate in x5chain.
+    func resolveDocumentSignerCertificate() -> X509.Certificate? {
+        guard !issuerAuth.x5chain.isEmpty else { return nil }
+        return try? X509.Certificate(derEncoded: issuerAuth.x5chain[0])
+    }
+
+    /// Validates the issuer certificate chain against the trust validator, returning an
+    /// `.issuerTrustFailed` error carrying the validator's failure reason when the chain is
+    /// not trusted. Returns `nil` when no trust validator is provided or the chain is trusted.
+    func validateIssuerTrust(
+        trustValidator: (any CertificateTrustValidator)
+    ) async -> [MsoValidationError]? {
+        guard !issuerAuth.x5chain.isEmpty else {
+            return [.issuerTrustFailed("No issuer certificates provided in x5chain")]
+        }
+        let (trusted, failureReason) = await trustValidator.validateCertTrustPath(chain: issuerAuth.x5chain.map { Data($0) })
+        guard trusted else {
+            return [.issuerTrustFailed(failureReason ?? "The issuer certificate chain is not trusted")]
+        }
+        return nil
+    }
+
     func validateValidityInfo(
         mso: MobileSecurityObject,
-        _ rejectIfValidUntilExceedsCertificateValidity: Bool = false
+        _ rejectIfValidUntilExceedsCertificateValidity: Bool = false,
+        dsCertificate: X509.Certificate? = nil
     ) -> [MsoValidationError]? {
-        guard !issuerAuth.x5chain.isEmpty,
-              let dsCert = try? X509.Certificate(derEncoded: issuerAuth.x5chain[0]) else {
+        let resolvedCert = dsCertificate
+            ?? (issuerAuth.x5chain.isEmpty ? nil : try? X509.Certificate(derEncoded: issuerAuth.x5chain[0]))
+        guard let dsCert = resolvedCert else {
             return [.signatureVerificationFailed("No issuer certificates provided in x5chain")]
         }
         guard let signedDate = mso.validityInfo.signed.convertToLocalDate(),
@@ -152,6 +178,5 @@ extension IssuerSigned {
         }
         return nil
     }
-
 
 }

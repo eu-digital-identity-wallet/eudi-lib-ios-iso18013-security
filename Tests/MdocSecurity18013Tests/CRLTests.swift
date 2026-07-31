@@ -81,7 +81,7 @@ struct CRLTests {
 		#expect(crl.verifySignature(issuer: x509root), "CRL signature must be valid against issuing CA")
 		// Also verify via fetchCRLSerialNumbers which integrates all checks
 		var messages = [String]()
-		let serials = SecurityHelpers.fetchCRLSerialNumbers(x509root, messages: &messages)
+		let serials = SecurityHelpers.fetchCRLSerialNumbers(x509root, revocationPolicy: .warning, messages: &messages) ?? []
 		#expect(!messages.contains(where: { $0.contains("invalid signature") }), "fetchCRLSerialNumbers should not report signature errors: \(messages)")
 		print("Fetched \(serials.count) revoked serial(s), messages: \(messages)")
 	}

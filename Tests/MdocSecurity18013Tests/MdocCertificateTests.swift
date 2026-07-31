@@ -63,7 +63,7 @@ struct CertificateHandlingTests {
 	func isMdocX5cValidNoRoots() throws {
 		let leafCert = try #require(eudiIaca.first)
 		let (isValid, messages, rootCert) = SecurityHelpers.isMdocX5cValid(
-			secCerts: [leafCert], usage: .mdocReaderAuth, rootIaca: [])
+			secCerts: [leafCert], usage: .mdocReaderAuth, revocationPolicy: .hardFail, rootIaca: [])
 		#expect(!isValid)
 		#expect(rootCert == nil)
 		#expect(messages.contains(where: { $0.contains("not matched with root certificates") }))
@@ -74,7 +74,7 @@ struct CertificateHandlingTests {
 	func isMdocX5cValidSelfSignedRoot() throws {
 		let leafCert = try #require(eudiIaca.first)
 		// Use the same cert as a "root" — it is self-signed
-		let (isValid, messages, _) = SecurityHelpers.isMdocX5cValid(secCerts: [leafCert], usage: .mdocReaderAuth, rootIaca: [eudiIaca])
+		let (isValid, messages, _) = SecurityHelpers.isMdocX5cValid(secCerts: [leafCert], usage: .mdocReaderAuth, revocationPolicy: .hardFail, rootIaca: [eudiIaca])
 		// The cert is self signed
 		#expect(isValid)
 		print("Messages:", messages)
@@ -92,7 +92,7 @@ struct CertificateHandlingTests {
 	func isMdocX5cValidParameterized(testCase: X5cValidationTestCase) async throws {
 		let leafCerts = testCase.leafPEMs.compactMap { Self.secCertificate(fromPEM: $0) }
 		let (isValid, messages, _) = SecurityHelpers.isMdocX5cValid(
-			secCerts: leafCerts, usage: testCase.usage, rootIaca: [eudiIaca])
+			secCerts: leafCerts, usage: testCase.usage, revocationPolicy: .hardFail, rootIaca: [eudiIaca])
 		#expect(isValid == testCase.expectedValid, "Test '\(testCase.name)' expected isValid=\(testCase.expectedValid), got \(isValid). Messages: \(messages)")
 		print("Test '\(testCase.name)' messages:", messages)
 		let (isValid2, messages2, _) = await SecurityHelpers.isChainFound(secCerts: leafCerts, rootIaca: [eudiIaca])

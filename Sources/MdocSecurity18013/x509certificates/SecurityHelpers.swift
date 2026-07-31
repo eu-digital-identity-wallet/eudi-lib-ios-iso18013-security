@@ -53,7 +53,8 @@ public class SecurityHelpers {
 	public static func isMdocX5cValid(
 		secCerts: x5chain,
 		usage: CertificateUsage,
-		rootIaca: [x5chain]
+		revocationPolicy: RevocationPolicy,
+		rootIaca: [x5chain],
 	) -> (isValid: Bool, validationMessages: [String], rootCert: SecCertificate?) {
 		guard let secCert = secCerts.first else { return (false, ["Certificate not found"], nil) }
 		// convert to swift-certificates object
@@ -113,11 +114,11 @@ public class SecurityHelpers {
 						return (false, ["Issuer data rfc822Name or uniformResourceIdentifier do not match with root cert."], nil)
 					}
 				}
-				let bs = fetchCRLSerialNumbers(x509root, messages: &messages)
-				if !bs.isEmpty {
-					if bs.contains(x509cert.serialNumber) { return (false, ["Revoked issued Certificate"], rootCert)}
-					if bs.contains(x509root.serialNumber) { return (false,["Revoked Root Certificate"], rootCert)}
+				guard let bs = fetchCRLSerialNumbers(x509root, revocationPolicy: revocationPolicy, messages: &messages) else {
+					return (false, ["CRL revocation check failed"], nil)
 				}
+				if bs.contains(x509cert.serialNumber) { return (false, ["Revoked issued Certificate"], rootCert)}
+				if bs.contains(x509root.serialNumber) { return (false,["Revoked Root Certificate"], rootCert)}
 				return (true, messages, rootCert)
 			}
 		} // next
@@ -180,30 +181,45 @@ public class SecurityHelpers {
 
 	public static func fetchCRLSerialNumbers(
 		_ x509root: X509.Certificate,
+        revocationPolicy: RevocationPolicy,
 		messages: inout [String]
-	) -> [Certificate.SerialNumber] {
+	) -> [Certificate.SerialNumber]? {
 		var bs = [Certificate.SerialNumber]()
 		if let crlDistributionExtension = x509root.extensions[oid: .X509ExtensionID.cRLDistributionPoints],
 		   let crlDistributions = try? CRLDistributions(derEncoded: crlDistributionExtension.value) {
 			for crl in crlDistributions.crls {
-				guard let crlUrl = URL(string: crl.distributionPoint) else { continue }
-				guard let crlData = try? Data(contentsOf: crlUrl) else { continue }
+				guard let crlUrl = URL(string: crl.distributionPoint) else {
+					if revocationPolicy == .hardFail { return nil }
+					continue
+				}
+				guard let crlData = try? Data(contentsOf: crlUrl) else {
+					if revocationPolicy == .hardFail { return nil }
+					continue
+				}
 				let crl: CRL
 				if let pemString = String(data: crlData, encoding: .utf8), pemString.contains("-----BEGIN") {
-					guard let pemCrl = try? CRL(pemEncoded: pemString) else { continue }
+					guard let pemCrl = try? CRL(pemEncoded: pemString) else {
+						if revocationPolicy == .hardFail { return nil }
+						continue
+					}
 					crl = pemCrl
 				} else {
-					guard let derCrl = try? CRL(derEncoded: Array(crlData)) else { continue }
+					guard let derCrl = try? CRL(derEncoded: Array(crlData)) else {
+						if revocationPolicy == .hardFail { return nil }
+						continue
+					}
 					crl = derCrl
 				}
 				guard crl.isValid else {
 					let validityWindow = "thisUpdate: \(crl.thisUpdate), nextUpdate: \(crl.nextUpdate)"
 					let errorMessage = "CRL from \(crlUrl) is not within its validity period (\(validityWindow))"
 					messages.append(errorMessage)
+					if revocationPolicy == .hardFail { return nil }
 					continue
 				}
 				guard crl.verifySignature(issuer: x509root) else {
 					messages.append("CRL from \(crlUrl) has an invalid signature")
+					if revocationPolicy == .hardFail { return nil }
 					continue
 				}
 				bs.append(contentsOf: crl.revokedSerials.map(\.serial))

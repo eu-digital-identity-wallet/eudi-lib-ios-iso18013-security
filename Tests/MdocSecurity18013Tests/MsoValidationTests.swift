@@ -60,7 +60,7 @@ struct MsoValidationTests {
         let deviceKey = iss.issuerAuth.mso.deviceKeyInfo.deviceKey
         var publicCoseKeys = [deviceKey]
         do {
-            try iss.validate(docType: "eu.europa.ec.eudi.pid.1", publicCoseKeys: &publicCoseKeys)
+            try await iss.validate(docType: "eu.europa.ec.eudi.pid.1", trustValidator: NoopCertificateTrustValidator(), trustPolicy: .warning, publicCoseKeys: &publicCoseKeys)
         } catch {
             // Expected to fail due to missing/invalid certificates in x5chain
             switch error {
