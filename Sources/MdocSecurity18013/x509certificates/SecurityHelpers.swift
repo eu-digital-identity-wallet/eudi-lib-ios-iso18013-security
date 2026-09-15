@@ -130,7 +130,7 @@ public class SecurityHelpers {
 		var error: CFError?
 		let isValid = SecTrustEvaluateWithError(trust, &error)
 		//if let error { logger.error("Error evaluating trust: \(error)") }
-        return (isValid, error?.localizedDescription, (error as NSError?)?.code)
+        return (isValid, error?.localizedDescription, (error as? NSError)?.code)
 	}
 
 	public static func isChainFound(
