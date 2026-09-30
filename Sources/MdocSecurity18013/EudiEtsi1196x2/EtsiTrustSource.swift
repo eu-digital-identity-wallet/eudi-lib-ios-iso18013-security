@@ -40,38 +40,29 @@ public struct EtsiTrustSource: @unchecked Sendable {
     /// `cacheTtlHours` expressed in hours, for the `EudiwIosTrust.cached(ttlHours:)` boundary.
     public let cacheTtlHours: Double
 
+    /// Whether PKIX certificate validation checks revocation. Defaults to `false`.
+    public let isRevocationEnabled: Bool
+
     public init(
         loteLocations: SupportedLists<NSString>,
         contextTypeMappings: EtsiContextTypeMappings? = nil,
         cacheTtlHours: TimeInterval = EtsiTrustSource.defaultCacheTtlHours,
         customJwtSignatureVerifier: (any VerifyJwtSignature)? = nil,
-        loteConstraints: any LoadLoTEAndPointersConstraints = LoadLoTEAndPointersConstraintsDoNotLoadOtherPointers.shared
+        loteConstraints: any LoadLoTEAndPointersConstraints = LoadLoTEAndPointersConstraintsDoNotLoadOtherPointers.shared,
+        isRevocationEnabled: Bool
     ) {
         self.loteLocations = loteLocations
         self.contextTypeMappings = contextTypeMappings
         self.cacheTtlHours = cacheTtlHours
         self.customJwtSignatureVerifier = customJwtSignatureVerifier
         self.loteConstraints = loteConstraints
+        self.isRevocationEnabled = isRevocationEnabled
     }
 }
 
 // MARK: - Ready-made environment presets
 
 extension EtsiTrustSource {
-    /// LoTE trust lists for the EC DIGIT acceptance environment (PID, Wallet, WRPAC, mDL).
-    ///
-    /// certificate a reader presents. Build `EtsiTrustConfig` directly to target another context.
-    public static var digiTrust: Self { Self(loteLocations: SupportedLists<NSString>(
-                pidProviders: DIGITTrustLists.pidProviders as NSString,
-                walletProviders: DIGITTrustLists.walletProviders as NSString,
-                wrpacProviders: DIGITTrustLists.wrpacProviders as NSString,
-                wrprcProviders: nil,
-                pubEaaProviders: nil,
-                qeaProviders: nil,
-                eaaProviders: [EudiwIosTrust.shared.mdlUseCase: DIGITTrustLists.mdlProviders as NSString]
-            )
-        )
-    }
 
     /// LoTE trust lists for the EUDI Wallet Reference Implementation environment
     /// (PID, Wallet, WRPAC, WRPRC; no mDL list is published there).
@@ -82,10 +73,8 @@ extension EtsiTrustSource {
                 walletProviders: EUDIRefImplLists.walletProviders as NSString,
                 wrpacProviders: EUDIRefImplLists.wrpacProviders as NSString,
                 wrprcProviders: EUDIRefImplLists.wrprcProviders as NSString,
-                pubEaaProviders: nil,
-                qeaProviders: nil,
-                eaaProviders: [:]
-            )
+                pubEaaProviders: EUDIRefImplLists.pubEaaProviders as NSString,
+                qeaProviders: nil, eaaProviders: [:]), isRevocationEnabled: false
         )
     }
 }

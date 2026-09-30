@@ -64,8 +64,7 @@ public final class EtsiTrustManager: @unchecked Sendable {
                 ttlHours: etsi.cacheTtlHours,
                 verifyJwtSignature: verifyJwtSignature,
                 directTrust: ValidateCertificateChainUsingDirectTrustIosKt.ValidateCertificateChainUsingDirectTrustIos,
-                // Preserve the revocation policy used by the previous framework default.
-                pkix: ValidateCertificateChainUsingPKIXIos.companion.invoke(isRevocationEnabled: false)
+                pkix: ValidateCertificateChainUsingPKIXIos.companion.invoke(isRevocationEnabled: etsi.isRevocationEnabled)
             )
             validateChain = { chain, context in
                 do {

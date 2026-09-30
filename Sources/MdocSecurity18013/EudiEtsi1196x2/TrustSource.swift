@@ -40,7 +40,8 @@ public enum TrustSource: @unchecked Sendable {
                 contextTypeMappings: mappings,
                 cacheTtlHours: source.cacheTtlHours,
                 customJwtSignatureVerifier: source.customJwtSignatureVerifier,
-                loteConstraints: source.loteConstraints
+                loteConstraints: source.loteConstraints,
+                isRevocationEnabled: source.isRevocationEnabled
             ))
         case .staticList(let source):
             return .staticList(StaticListTrustSource(
