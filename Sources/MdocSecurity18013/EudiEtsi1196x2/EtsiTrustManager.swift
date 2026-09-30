@@ -36,7 +36,7 @@ public final class EtsiTrustManager: @unchecked Sendable {
     /// Builds a trust manager from the selected `TrustConfig`.
     ///
     /// - source: Trust source
-    /// - `.etsi`: a cached LoTE validator via `EudiwIosTrust.cached(urls:ttlHours:verifyJwtSignature:)`,
+    /// - `.etsi`: a cached LoTE validator via `EudiwIosTrust.cached(urls:ttlHours:verifyJwtSignature:directTrust:pkix:)`,
     ///   which honors `loteLocations`, `cacheTtl`, and `customJwtSignatureVerifier`.
     /// - `.staticList`: a bundled-anchors validator via `EudiwIosTrust.usingBundledAnchors(anchors:method:)`
     ///   — no LoTE download, no network.
@@ -59,7 +59,14 @@ public final class EtsiTrustManager: @unchecked Sendable {
             urls.mdlProviders = lists.eaaProviders[EudiwIosTrust.shared.mdlUseCase] as String?
 
             let verifyJwtSignature: VerifyJwtSignature = etsi.customJwtSignatureVerifier ?? x5cVerifyJwtOrCwt.shared
-            let validator = EudiwIosTrust.shared.cached(urls: urls, ttlHours: etsi.cacheTtlHours, verifyJwtSignature: verifyJwtSignature)
+            let validator = EudiwIosTrust.shared.cached(
+                urls: urls,
+                ttlHours: etsi.cacheTtlHours,
+                verifyJwtSignature: verifyJwtSignature,
+                directTrust: ValidateCertificateChainUsingDirectTrustIosKt.ValidateCertificateChainUsingDirectTrustIos,
+                // Preserve the revocation policy used by the previous framework default.
+                pkix: ValidateCertificateChainUsingPKIXIos.companion.invoke(isRevocationEnabled: false)
+            )
             validateChain = { chain, context in
                 do {
                     let iosVal = try await validator.validate(chain: chain, context: context)
