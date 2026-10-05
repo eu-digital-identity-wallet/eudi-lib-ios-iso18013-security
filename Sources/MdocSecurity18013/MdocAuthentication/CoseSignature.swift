@@ -56,7 +56,7 @@ extension Cose {
 			return false
 		}
 		switch verifyAlgorithm {
-		case .es256:
+		case .es256, .esp256:
 			let signingPubKey = try P256.Signing.PublicKey(x963Representation: publicKey_x963)
 			let ecdsaSignature = try P256.Signing.ECDSASignature(rawRepresentation: signature)
 			isValidSignature = signingPubKey.isValidSignature(ecdsaSignature, for: signatureStruct)

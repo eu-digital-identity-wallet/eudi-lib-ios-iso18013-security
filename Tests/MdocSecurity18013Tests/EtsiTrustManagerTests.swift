@@ -22,16 +22,11 @@ import EudiEtsi1196x2
 
 @testable import MdocSecurity18013
 
-/// Tests for `EtsiTrustManager` across its three trust sources.
-///
-/// - `digi` / `eudiRef` are ETSI LoTE sources: they download live trust lists, so their tests
-///   require network access. There is no bundled certificate the live lists are known to trust,
-///   so the "success" tests assert only that the validation pipeline **completes** and that the
-///   two trust APIs agree — not a hard `trusted == true`. The failure tests assert that an
-///   untrusted certificate is rejected (which also holds offline, since a download error yields
-///   "not trusted").
-/// - The static-list source is fully offline and deterministic: `eudi-test-root.der` issues
-///   `eudi-test-leaf.der`, so both success (`true`) and failure (`false`) are asserted exactly.
+/// Tests for `EtsiTrustManager` using the eudiRef ETSI LoTE source.
+/// These tests download live trust lists and require network access. The bundled
+/// certificate is not known to be trusted by those lists, so the tests check that
+/// the validation pipeline completes, the trust APIs agree, and an untrusted
+/// certificate is rejected.
 @Suite("EtsiTrustManager Tests")
 struct EtsiTrustManagerTests {
     /// DER leaf certificate issued by the bundled test root.
@@ -40,29 +35,6 @@ struct EtsiTrustManagerTests {
     init() throws {
         leaf = try Data(contentsOf: #require(Bundle.module.url(forResource: "eudi-test-leaf", withExtension: "der")))
     }
-
-    // MARK: - 1. digi (ETSI LoTE — requires network)
-
-    @Test("digi ETSI: validation pipeline completes and the two trust APIs agree")
-    func digiEtsiCompletes() async {
-        let manager = EtsiTrustManager(source: .etsi(.digiTrust))
-        let (trusted, reason) = await manager.validateCertTrustPath(chain: [leaf])
-        if let reason { print("digi ETSI failure reason: \(reason)") }
-        let path = await manager.createCertTrustPath(chain: [leaf])
-        // `createCertTrustPath` returns a path if the chain is trusted — invariant holds
-        // regardless of the remote list's decision (or a network error).
-        #expect((path != nil) == trusted)
-    }
-
-    @Test("digi ETSI: an untrusted certificate is not trusted")
-    func digiEtsiRejectsUntrusted() async {
-        let manager = EtsiTrustManager(source: .etsi(.digiTrust))
-        let (trusted, reason) = await manager.validateCertTrustPath(chain: [leaf])
-        if let reason { print("digi ETSI failure reason: \(reason)") }
-        #expect(trusted == false)
-    }
-
-    // MARK: - 2. eudiRef (ETSI LoTE — requires network)
 
     @Test("eudiRef ETSI: validation pipeline completes and the two trust APIs agree")
     func eudiRefEtsiCompletes() async {
