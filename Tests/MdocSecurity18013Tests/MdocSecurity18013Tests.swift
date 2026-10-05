@@ -17,12 +17,27 @@ import Foundation
 import Testing
 import SwiftCBOR
 import Security
+import CryptoKit
 
 @testable import MdocDataModel18013
 @testable import MdocSecurity18013
 
 @Suite("MdocSecurity18013 Tests")
 struct MdocSecurity18013Tests {
+
+    @Test("Validate detached P-256 signatures", arguments: [Cose.VerifyAlgorithm.es256, .esp256])
+    func validateDetachedP256Signature(algorithm: Cose.VerifyAlgorithm) throws {
+        let privateKey = P256.Signing.PrivateKey()
+        let payload = Data("device authentication".utf8)
+        let coseWithPayload = Cose(type: .sign1, algorithm: algorithm.rawValue, payloadData: payload)
+        let signatureStruct = try #require(coseWithPayload.signatureStruct)
+        let signature = try privateKey.signature(for: signatureStruct)
+        let detachedCose = Cose(type: .sign1, algorithm: algorithm.rawValue, signature: signature.rawRepresentation)
+        let publicKey = privateKey.publicKey.x963Representation
+
+        #expect(try detachedCose.validateDetachedCoseSign1(payloadData: payload, publicKey_x963: publicKey))
+        #expect(try !detachedCose.validateDetachedCoseSign1(payloadData: Data("tampered payload".utf8), publicKey_x963: publicKey))
+    }
 
     @Test("Decode session transcript from annex D.5.1")
     func decodeSessionTranscriptAnnexD51() throws {
