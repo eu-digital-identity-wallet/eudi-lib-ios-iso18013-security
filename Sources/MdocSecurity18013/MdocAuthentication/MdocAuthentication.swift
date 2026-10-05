@@ -61,11 +61,13 @@ public struct MdocAuthentication: Sendable {
 	/// - Parameters:
 	///   - docType: docType of the document to authenticate
 	///   - deviceNameSpacesRawData: device-name spaces raw data. Usually is a CBOR-encoded empty dictionary
-	///   - bUseDeviceSign: Specify true for device authentication (false is default)
+	///   - dauthMethod: Device signature or device MAC authentication
+	///   - signatureAlgorithm: COSE algorithm for device signatures; defaults to ES256 and is ignored for device MACs
 	/// - Returns: DeviceAuth instance
     public func getDeviceAuthForTransfer(
         docType: String,
         dauthMethod: DeviceAuthMethod,
+        signatureAlgorithm: Cose.VerifyAlgorithm = .es256,
         deviceNameSpaces: DeviceNameSpaces?,
         unlockData: Data?,
         authenticationContext: ThreadSafeAuthContext
@@ -83,7 +85,7 @@ public struct MdocAuthentication: Sendable {
 			detachedAuthCose = try await Cose.makeDetachedCoseSign1(
 				payloadData: Data(contentBytes),
 				deviceKey: authKeys.privateKey,
-				alg: .es256,
+				alg: signatureAlgorithm,
 				unlockData: unlockData,
 				authenticationContext: authenticationContext
 			)
