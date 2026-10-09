@@ -39,6 +39,17 @@ public enum EtsiContextType: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+extension EtsiContextType {
+    /// Whether `context` is the verification context this type stands for. The shared
+    /// contexts are singletons; the mDL context is created per use and matched by type.
+    func matches(_ context: any VerificationContext) -> Bool {
+        switch self {
+        case .mdl: return context is VerificationContextEAA
+        default: return (context as AnyObject) === (verificationContext as AnyObject)
+        }
+    }
+}
+
 public typealias EtsiContextTypeMappings = OrderedDictionary<String, EtsiContextType>
 
 public extension OrderedDictionary where Key == String, Value == EtsiContextType {
