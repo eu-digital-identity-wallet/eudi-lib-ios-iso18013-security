@@ -40,12 +40,16 @@ public enum EtsiContextType: String, CaseIterable, Identifiable, Sendable {
 }
 
 extension EtsiContextType {
-    /// Whether `context` is the verification context this type stands for. The shared
-    /// contexts are singletons; the mDL context is created per use and matched by type.
+    /// Whether `context` is the verification context this type stands for. Matched by type:
+    /// each `.shared` access on a Kotlin object returns a fresh Objective-C wrapper, so an
+    /// identity check never matches. The mDL context is created per use case.
     func matches(_ context: any VerificationContext) -> Bool {
         switch self {
+        case .pid: return context is VerificationContextPID
         case .mdl: return context is VerificationContextEAA
-        default: return (context as AnyObject) === (verificationContext as AnyObject)
+        case .wallet: return context is VerificationContextWalletProviderAttestation
+        case .wrpac: return context is VerificationContextWalletRelyingPartyAccessCertificate
+        case .wrprc: return context is VerificationContextWalletRelyingPartyRegistrationCertificate
         }
     }
 }
