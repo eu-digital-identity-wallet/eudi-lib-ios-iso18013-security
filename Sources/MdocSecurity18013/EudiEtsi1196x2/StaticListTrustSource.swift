@@ -31,15 +31,22 @@ public struct StaticListTrustSource: @unchecked Sendable {
     public let method: BundledAnchorMethod
     /// Doc-type → context mappings used to select the verification context per document.
     public let contextTypeMappings: EtsiContextTypeMappings?
+    /// Whether chain validation requires a positive OCSP response (`true`, the historical
+    /// behaviour) or evaluates the chain against the anchors without a revocation check
+    /// (`false`). Certificates without an OCSP responder, such as the EUDI reference
+    /// verifier's, can only validate with `false`. Mirrors `EtsiTrustSource.isRevocationEnabled`.
+    public let isRevocationEnabled: Bool
 
     public init(
         anchorsPerContext: [EtsiContextType: [Data]],
         method: BundledAnchorMethod = .pkix,
-        contextTypeMappings: EtsiContextTypeMappings? = nil
+        contextTypeMappings: EtsiContextTypeMappings? = nil,
+        isRevocationEnabled: Bool = true
     ) {
         self.anchorsPerContext = anchorsPerContext
         self.method = method
         self.contextTypeMappings = contextTypeMappings
+        self.isRevocationEnabled = isRevocationEnabled
     }
 
     /// Convenience initializer for a single list of root certificates anchoring one context.
@@ -51,12 +58,14 @@ public struct StaticListTrustSource: @unchecked Sendable {
     public init(
         rootCertificates: [Data],
         method: BundledAnchorMethod = .pkix,
-        contextTypeMappings: EtsiContextTypeMappings? = nil
+        contextTypeMappings: EtsiContextTypeMappings? = nil,
+        isRevocationEnabled: Bool = true
     ) {
         self.init(
             anchorsPerContext: [.pid: rootCertificates, .mdl: rootCertificates, .wallet: rootCertificates, .wrpac: rootCertificates, .wrprc: rootCertificates],
             method: method,
-            contextTypeMappings: contextTypeMappings
+            contextTypeMappings: contextTypeMappings,
+            isRevocationEnabled: isRevocationEnabled
         )
     }
 
