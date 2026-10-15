@@ -1,0 +1,32 @@
+name: Test Fastlane Coverage
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26.5'
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3.6'
+          bundler: '2.4.22'
+          bundler-cache: true
+
+      - name: Run Fastlane coverage
+        run: bundle exec fastlane code_coverage
+        env:
+          CI: 'true'
+          IOS_SIMULATOR_DEVICE: iPhone Air
+          IOS_SIMULATOR_OS: latest
