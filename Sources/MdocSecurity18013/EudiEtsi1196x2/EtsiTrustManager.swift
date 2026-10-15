@@ -77,7 +77,7 @@ public final class EtsiTrustManager: @unchecked Sendable {
                 }
             }
             cachedValidator = validator
-        case .staticList(let staticList):
+        case .staticList(let staticList) where staticList.isRevocationEnabled:
             let validator = EudiwIosTrust.shared.usingBundledAnchors(anchors: staticList.bundledAnchors, method: staticList.method)
             validateChain = { chain, context in
                 do {
@@ -88,6 +88,23 @@ public final class EtsiTrustManager: @unchecked Sendable {
                     logger.error("Bundled-anchors chain validation failed: \(error)")
                     return nil
                 }
+            }
+            cachedValidator = nil
+        case .staticList(let staticList):
+            // `EudiwIosTrust.usingBundledAnchors` always evaluates with a revocation policy that
+            // requires a positive OCSP response, which no certificate without an OCSP responder
+            // can satisfy. With revocation disabled the chain is evaluated here instead, against
+            // the anchors of the requested context, with the same PKIX / direct-trust semantics.
+            let anchorsPerContext = staticList.anchorsPerContext
+            let method = staticList.method
+            validateChain = { chain, context in
+                guard let contextType = EtsiContextType.allCases.first(where: { $0.matches(context) }),
+                      let anchors = anchorsPerContext[contextType], !anchors.isEmpty else {
+                    return IosValidationResult(isTrusted: false, matchedAnchor: nil, failureReason: "No validator configured for this context")
+                }
+                let iosVal = BundledAnchorsValidator.validate(chain: chain, anchors: anchors, method: method)
+                if let failReason = iosVal.failureReason { logger.warning("Bundled-anchors not trusted reason: \(failReason)")}
+                return iosVal
             }
             cachedValidator = nil
         }

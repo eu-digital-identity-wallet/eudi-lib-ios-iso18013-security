@@ -47,7 +47,8 @@ public enum TrustSource: @unchecked Sendable {
             return .staticList(StaticListTrustSource(
                 anchorsPerContext: source.anchorsPerContext,
                 method: source.method,
-                contextTypeMappings: mappings
+                contextTypeMappings: mappings,
+                isRevocationEnabled: source.isRevocationEnabled
             ))
         }
     }
