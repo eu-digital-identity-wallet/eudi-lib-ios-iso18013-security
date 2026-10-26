@@ -31,6 +31,11 @@ public struct EtsiTrustSource: @unchecked Sendable {
     /// Optional custom JWT signature verifier for LoTE JWTs; when `nil`, the core uses
     /// its built-in verifier.
     public let customJwtSignatureVerifier: (any VerifyJwtSignature)?
+    /// Optional custom LoTE loader; when `nil`, the core fetches each LoTE with the built-in
+    /// downloader. Use it to fetch LoTEs through your own HTTP stack or to serve locally
+    /// persisted copies (e.g. for offline proximity presentation). Whatever the loader returns
+    /// still goes through JWT signature verification and expiry checks.
+    public let loadLoTE: (any IosLoadLoTE)?
     /// Controls whether additional LoTE pointers are followed.
     public let loteConstraints: any LoadLoTEAndPointersConstraints
 
@@ -48,6 +53,7 @@ public struct EtsiTrustSource: @unchecked Sendable {
         contextTypeMappings: EtsiContextTypeMappings? = nil,
         cacheTtlHours: TimeInterval = EtsiTrustSource.defaultCacheTtlHours,
         customJwtSignatureVerifier: (any VerifyJwtSignature)? = nil,
+        loadLoTE: (any IosLoadLoTE)? = nil,
         loteConstraints: any LoadLoTEAndPointersConstraints = LoadLoTEAndPointersConstraintsDoNotLoadOtherPointers.shared,
         isRevocationEnabled: Bool
     ) {
@@ -55,6 +61,7 @@ public struct EtsiTrustSource: @unchecked Sendable {
         self.contextTypeMappings = contextTypeMappings
         self.cacheTtlHours = cacheTtlHours
         self.customJwtSignatureVerifier = customJwtSignatureVerifier
+        self.loadLoTE = loadLoTE
         self.loteConstraints = loteConstraints
         self.isRevocationEnabled = isRevocationEnabled
     }

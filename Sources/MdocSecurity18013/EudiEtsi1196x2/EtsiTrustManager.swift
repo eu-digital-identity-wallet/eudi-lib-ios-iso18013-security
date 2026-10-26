@@ -37,7 +37,9 @@ public final class EtsiTrustManager: @unchecked Sendable {
     ///
     /// - source: Trust source
     /// - `.etsi`: a cached LoTE validator via `EudiwIosTrust.cached(urls:ttlHours:verifyJwtSignature:directTrust:pkix:)`,
-    ///   which honors `loteLocations`, `cacheTtl`, and `customJwtSignatureVerifier`.
+    ///   which honors `loteLocations`, `cacheTtl`, and `customJwtSignatureVerifier`. When `loadLoTE` is set,
+    ///   the `EudiwIosTrust.cached(urls:ttlHours:verifyJwtSignature:loadLoTE:directTrust:pkix:)` overload is used
+    ///   so each LoTE is obtained from that loader instead of the built-in downloader.
     /// - `.staticList`: a bundled-anchors validator via `EudiwIosTrust.usingBundledAnchors(anchors:method:)`
     ///   — no LoTE download, no network.
     /// - defaultVerificationContext
@@ -59,13 +61,26 @@ public final class EtsiTrustManager: @unchecked Sendable {
             urls.mdlProviders = lists.eaaProviders[EudiwIosTrust.shared.mdlUseCase] as String?
 
             let verifyJwtSignature: VerifyJwtSignature = etsi.customJwtSignatureVerifier ?? x5cVerifyJwtOrCwt.shared
-            let validator = EudiwIosTrust.shared.cached(
-                urls: urls,
-                ttlHours: etsi.cacheTtlHours,
-                verifyJwtSignature: verifyJwtSignature,
-                directTrust: ValidateCertificateChainUsingDirectTrustIosKt.ValidateCertificateChainUsingDirectTrustIos,
-                pkix: ValidateCertificateChainUsingPKIXIos.companion.invoke(isRevocationEnabled: etsi.isRevocationEnabled)
-            )
+            let directTrust = ValidateCertificateChainUsingDirectTrustIosKt.ValidateCertificateChainUsingDirectTrustIos
+            let pkix = ValidateCertificateChainUsingPKIXIos.companion.invoke(isRevocationEnabled: etsi.isRevocationEnabled)
+            let validator = if let loadLoTE = etsi.loadLoTE {
+                EudiwIosTrust.shared.cached(
+                    urls: urls,
+                    ttlHours: etsi.cacheTtlHours,
+                    verifyJwtSignature: verifyJwtSignature,
+                    loadLoTE: loadLoTE,
+                    directTrust: directTrust,
+                    pkix: pkix
+                )
+            } else {
+                EudiwIosTrust.shared.cached(
+                    urls: urls,
+                    ttlHours: etsi.cacheTtlHours,
+                    verifyJwtSignature: verifyJwtSignature,
+                    directTrust: directTrust,
+                    pkix: pkix
+                )
+            }
             validateChain = { chain, context in
                 do {
                     let iosVal = try await validator.validate(chain: chain, context: context)
