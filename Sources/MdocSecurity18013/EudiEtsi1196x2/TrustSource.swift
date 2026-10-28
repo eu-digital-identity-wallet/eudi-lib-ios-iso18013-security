@@ -40,6 +40,7 @@ public enum TrustSource: @unchecked Sendable {
                 contextTypeMappings: mappings,
                 cacheTtlHours: source.cacheTtlHours,
                 customJwtSignatureVerifier: source.customJwtSignatureVerifier,
+                loadLoTE: source.loadLoTE,
                 loteConstraints: source.loteConstraints,
                 isRevocationEnabled: source.isRevocationEnabled
             ))
