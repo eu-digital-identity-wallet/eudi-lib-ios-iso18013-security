@@ -228,10 +228,11 @@ public class SecurityHelpers {
 		return bs
 	}
 
-	/// Verify reader auth certificate extensions and properties.
+	/// Enforce the reader authentication certificate profile. Every profile violation is fatal.
 	/// - Returns: A tuple of (isValid, errorMessage). If isValid is false, validation must fail.
 	@discardableResult
 	public static func verifyReaderAuthCert(_ x509: X509.Certificate, messages: inout [String]) -> (Bool, String?) {
+		let initialMessageCount = messages.count
 		// check issuer
 		if !x509.issuer.isEmpty {
 			logger.info("Issuer \(x509.issuer.description)")
@@ -301,6 +302,10 @@ public class SecurityHelpers {
 			logger.info("CRL Distribution extension found")
 		} else {
 			messages.append("Missing CRL Distribution extension")
+		}
+		let profileErrors = messages.dropFirst(initialMessageCount)
+		guard profileErrors.isEmpty else {
+			return (false, profileErrors.joined(separator: "; "))
 		}
 		return (true, nil)
 	}
