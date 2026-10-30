@@ -18,6 +18,15 @@ import Foundation
 import CryptoKit
 import MdocDataModel18013
 import SwiftCBOR
+import os
+
+/// A session must be replaced after termination or counter exhaustion.
+public enum SessionEncryptionError: Error, Equatable, Sendable {
+    case counterExhausted
+    case sessionTerminated
+    case operationInProgress
+    case encryptionFailed
+}
 
 /// Session encryption uses standard ephemeral key ECDH to establish session
 /// keys for authenticated symmetric encryption.
@@ -25,13 +34,24 @@ import SwiftCBOR
 /// It is initialized from a) the session establishment data received from the
 /// mdoc reader, b) the device engagement data generated from the mdoc and c)
 /// the handover data.
+/// Copies share message counters and terminal state. Operations in each direction
+/// must be sequential; overlap is rejected. A cryptographic failure or cancellation
+/// terminates the session. Only a fresh device engagement may create a new session.
 ///
 /// ```swift
 /// var se = SessionEncryption(se: sessionEstablishmentObject, de: deviceEngagementObject, handOver: handOverObject)
 /// ```
 public struct SessionEncryption: Sendable {
 	public let sessionRole: SessionRole
-	var sessionCounter: UInt32 = 1
+    struct MessageCounters: Sendable {
+        var encryption: UInt64 = 1
+        var decryption: UInt64 = 1
+        var encrypting = false
+        var decrypting = false
+        var terminated = false
+    }
+    // The lock's shared storage follows struct copies, including copies made by callers.
+    let messageCounters = OSAllocatedUnfairLock(initialState: MessageCounters())
 	var errorCode: UInt?
 	static let IDENTIFIER0: [UInt8] = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
 	static let IDENTIFIER1: [UInt8] = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01]
@@ -100,22 +120,77 @@ public struct SessionEncryption: Sendable {
 
 	/// encrypt data using current nonce as described in 9.1.1.5 Cryptographic operations
 	mutating public func encrypt(_ data: [UInt8]) async throws -> [UInt8]? {
-		let nonce = try makeNonce(sessionCounter, isEncrypt: true)
-		let symmetricKeyForEncrypt = try await makeKeyAgreementAndDeriveSessionKey(isEncrypt: true)
-		let sealedBox = try AES.GCM.seal(data, using: symmetricKeyForEncrypt, nonce: nonce)
-		guard let encryptedContent = sealedBox.combined else { return nil }
-		sessionCounter += 1
-		return [UInt8](encryptedContent.dropFirst(12))
+        let counter = try beginOperation(isEncrypt: true)
+        defer { endOperation(isEncrypt: true) }
+        do {
+            let nonce = try makeNonce(counter, isEncrypt: true)
+            let key = try await makeKeyAgreementAndDeriveSessionKey(isEncrypt: true)
+            try Task.checkCancellation()
+            try checkActive()
+            let box = try AES.GCM.seal(data, using: key, nonce: nonce)
+            guard let content = box.combined else { throw SessionEncryptionError.encryptionFailed }
+            return Array(content.dropFirst(12))
+        } catch {
+            invalidate()
+            throw error
+        }
 	}
 
 	/// decryptes cipher data using the symmetric key
 	mutating public func decrypt(_ ciphertext: [UInt8]) async throws -> [UInt8] {
-		let nonce = try makeNonce(sessionCounter, isEncrypt: false)
-		let sealedBox = try AES.GCM.SealedBox(combined: nonce + ciphertext)
-		let symmetricKeyForDecrypt = try await makeKeyAgreementAndDeriveSessionKey(isEncrypt: false)
-		let decryptedContent = try AES.GCM.open(sealedBox, using: symmetricKeyForDecrypt)
-		return [UInt8](decryptedContent)
+        let counter = try beginOperation(isEncrypt: false)
+        defer { endOperation(isEncrypt: false) }
+        do {
+            let nonce = try makeNonce(counter, isEncrypt: false)
+            let box = try AES.GCM.SealedBox(combined: nonce + ciphertext)
+            let key = try await makeKeyAgreementAndDeriveSessionKey(isEncrypt: false)
+            try Task.checkCancellation()
+            try checkActive()
+            return Array(try AES.GCM.open(box, using: key))
+        } catch {
+            invalidate()
+            throw error
+        }
 	}
+
+    /// Terminates this session and all its copies. A fresh engagement is required to resume.
+    public func invalidate() {
+        messageCounters.withLock { $0.terminated = true }
+    }
+
+    private func checkActive() throws {
+        try messageCounters.withLock { state in
+            if state.terminated { throw SessionEncryptionError.sessionTerminated }
+        }
+    }
+
+    private func beginOperation(isEncrypt: Bool) throws -> UInt32 {
+        try messageCounters.withLock { state in
+            guard !state.terminated else { throw SessionEncryptionError.sessionTerminated }
+            // Never hold a lock across await. Reject overlapping operations in one direction
+            // so callers cannot accidentally deliver ciphertext in the wrong counter order.
+            guard !(isEncrypt ? state.encrypting : state.decrypting) else { throw SessionEncryptionError.operationInProgress }
+            let counter = isEncrypt ? state.encryption : state.decryption
+            guard counter <= UInt64(UInt32.max) else {
+                state.terminated = true
+                throw SessionEncryptionError.counterExhausted
+            }
+            if isEncrypt {
+                state.encryption += 1
+                state.encrypting = true
+            } else {
+                state.decryption += 1
+                state.decrypting = true
+            }
+            return UInt32(counter)
+        }
+    }
+
+    private func endOperation(isEncrypt: Bool) {
+        messageCounters.withLock { state in
+            if isEncrypt { state.encrypting = false } else { state.decrypting = false }
+        }
+    }
 	public var sessionTranscript: SessionTranscript {
 		SessionTranscript(
 			devEngRawData: deviceEngagementRawData,
