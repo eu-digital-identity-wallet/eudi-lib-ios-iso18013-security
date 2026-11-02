@@ -84,7 +84,7 @@ struct EtsiTrustSourceLoadLoTETests {
             loteLocations: lists,
             customJwtSignatureVerifier: AcceptAllJwtSignature(),
             loadLoTE: loader,
-            isRevocationEnabled: false
+            revocationPolicy: .disabled
         )
     }
 
