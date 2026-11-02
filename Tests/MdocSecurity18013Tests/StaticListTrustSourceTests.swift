@@ -40,7 +40,7 @@ struct StaticListTrustSourceTests {
 
     @Test("A reader chain to a bundled anchor is trusted without a revocation check")
     func readerChainTrustedWithoutRevocation() async {
-        let source = TrustSource.staticList(StaticListTrustSource(rootCertificates: [root], isRevocationEnabled: false))
+        let source = TrustSource.staticList(StaticListTrustSource(rootCertificates: [root], revocationPolicy: .disabled))
         let manager = EtsiTrustManager(source: source.withContextTypeMappings(nil), defaultVerificationContext: EtsiContextType.wrpac.verificationContext)
         let (isTrusted, reason) = await manager.validateCertTrustPath(chain: [leaf])
         #expect(isTrusted, "\(reason ?? "")")

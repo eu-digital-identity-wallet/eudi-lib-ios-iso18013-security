@@ -39,9 +39,11 @@ public final class EtsiTrustManager: @unchecked Sendable {
     /// - `.etsi`: a cached LoTE validator via `EudiwIosTrust.cached(urls:ttlHours:verifyJwtSignature:directTrust:pkix:)`,
     ///   which honors `loteLocations`, `cacheTtl`, and `customJwtSignatureVerifier`. When `loadLoTE` is set,
     ///   the `EudiwIosTrust.cached(urls:ttlHours:verifyJwtSignature:loadLoTE:directTrust:pkix:)` overload is used
-    ///   so each LoTE is obtained from that loader instead of the built-in downloader.
-    /// - `.staticList`: a bundled-anchors validator via `EudiwIosTrust.usingBundledAnchors(anchors:method:)`
-    ///   — no LoTE download, no network.
+    ///   so each LoTE is obtained from that loader instead of the built-in downloader. The PKIX validator
+    ///   checks revocation according to `revocationPolicy`.
+    /// - `.staticList`: a bundled-anchors validator via `EudiwIosTrust.usingBundledAnchors(anchors:method:directTrust:pkix:)`
+    ///   with a PKIX validator built from `revocationPolicy` — no LoTE download. With `.disabled` the chain is
+    ///   evaluated against the anchors without a revocation check, fully offline.
     /// - defaultVerificationContext
     /// - `fallback`: an optional manager used to validate the chain when this manager has no  verification context for the requested doc type.
     public init(source: TrustSource, defaultVerificationContext: (any VerificationContext)? = nil, fallback: EtsiTrustManager? = nil) {
@@ -62,7 +64,7 @@ public final class EtsiTrustManager: @unchecked Sendable {
 
             let verifyJwtSignature: VerifyJwtSignature = etsi.customJwtSignatureVerifier ?? x5cVerifyJwtOrCwt.shared
             let directTrust = ValidateCertificateChainUsingDirectTrustIosKt.ValidateCertificateChainUsingDirectTrustIos
-            let pkix = ValidateCertificateChainUsingPKIXIos.companion.invoke(isRevocationEnabled: etsi.isRevocationEnabled)
+            let pkix = etsi.revocationPolicy.pkixValidator()
             let validator = if let loadLoTE = etsi.loadLoTE {
                 EudiwIosTrust.shared.cached(
                     urls: urls,
@@ -92,8 +94,13 @@ public final class EtsiTrustManager: @unchecked Sendable {
                 }
             }
             cachedValidator = validator
-        case .staticList(let staticList) where staticList.isRevocationEnabled:
-            let validator = EudiwIosTrust.shared.usingBundledAnchors(anchors: staticList.bundledAnchors, method: staticList.method)
+        case .staticList(let staticList) where staticList.revocationPolicy.isEnabled:
+            let validator = EudiwIosTrust.shared.usingBundledAnchors(
+                anchors: staticList.bundledAnchors,
+                method: staticList.method,
+                directTrust: ValidateCertificateChainUsingDirectTrustIosKt.ValidateCertificateChainUsingDirectTrustIos,
+                pkix: staticList.revocationPolicy.pkixValidator()
+            )
             validateChain = { chain, context in
                 do {
                     let iosVal = try await EudiwIosTrust.shared.validate(validator: validator, chain: chain, context: context)
@@ -106,10 +113,8 @@ public final class EtsiTrustManager: @unchecked Sendable {
             }
             cachedValidator = nil
         case .staticList(let staticList):
-            // `EudiwIosTrust.usingBundledAnchors` always evaluates with a revocation policy that
-            // requires a positive OCSP response, which no certificate without an OCSP responder
-            // can satisfy. With revocation disabled the chain is evaluated here instead, against
-            // the anchors of the requested context, with the same PKIX / direct-trust semantics.
+            // Revocation disabled: the chain is evaluated here, offline, against the anchors of
+            // the requested context, with the same PKIX / direct-trust semantics.
             let anchorsPerContext = staticList.anchorsPerContext
             let method = staticList.method
             validateChain = { chain, context in
