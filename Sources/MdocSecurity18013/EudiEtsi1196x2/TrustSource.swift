@@ -42,14 +42,16 @@ public enum TrustSource: @unchecked Sendable {
                 customJwtSignatureVerifier: source.customJwtSignatureVerifier,
                 loadLoTE: source.loadLoTE,
                 loteConstraints: source.loteConstraints,
-                revocationPolicy: source.revocationPolicy
+                revocationPolicy: source.revocationPolicy,
+                crlChecker: source.crlChecker
             ))
         case .staticList(let source):
             return .staticList(StaticListTrustSource(
                 anchorsPerContext: source.anchorsPerContext,
                 method: source.method,
                 contextTypeMappings: mappings,
-                revocationPolicy: source.revocationPolicy
+                revocationPolicy: source.revocationPolicy,
+                crlChecker: source.crlChecker
             ))
         }
     }
