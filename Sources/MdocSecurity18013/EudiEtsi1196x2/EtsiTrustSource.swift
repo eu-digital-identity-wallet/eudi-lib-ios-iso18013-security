@@ -47,6 +47,9 @@ public struct EtsiTrustSource: @unchecked Sendable {
 
     /// How PKIX certificate validation checks revocation.
     public let revocationPolicy: PkixRevocationPolicy
+    /// The client's CRL checker, required by every policy that uses CRLs (`.crlOnly`, `.crlPriority`,
+    /// `.ocspPriority`): the PKIX validator cannot be created for those policies without it.
+    public let crlChecker: (any CheckRevocationIos)?
 
     /// Whether PKIX certificate validation checks revocation.
     @available(*, deprecated, message: "Use revocationPolicy instead")
@@ -59,7 +62,8 @@ public struct EtsiTrustSource: @unchecked Sendable {
         customJwtSignatureVerifier: (any VerifyJwtSignature)? = nil,
         loadLoTE: (any IosLoadLoTE)? = nil,
         loteConstraints: any LoadLoTEAndPointersConstraints = LoadLoTEAndPointersConstraintsDoNotLoadOtherPointers.shared,
-        revocationPolicy: PkixRevocationPolicy = .crlPriority
+        revocationPolicy: PkixRevocationPolicy = .ocspOnly,
+        crlChecker: (any CheckRevocationIos)? = nil
     ) {
         self.loteLocations = loteLocations
         self.contextTypeMappings = contextTypeMappings
@@ -68,6 +72,7 @@ public struct EtsiTrustSource: @unchecked Sendable {
         self.loadLoTE = loadLoTE
         self.loteConstraints = loteConstraints
         self.revocationPolicy = revocationPolicy
+        self.crlChecker = crlChecker
     }
 
     /// Creates a source from the legacy revocation flag: `true` checks revocation with OCSP only

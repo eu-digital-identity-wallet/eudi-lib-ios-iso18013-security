@@ -51,11 +51,11 @@ struct PkixRevocationPolicyTests {
         #expect(PkixRevocationPolicy(isRevocationEnabled: false) == .disabled)
     }
 
-    @Test("New initializers default to CRL priority")
-    func defaultsToCrlPriority() {
-        #expect(EtsiTrustSource(loteLocations: Self.emptyLists).revocationPolicy == .crlPriority)
-        #expect(StaticListTrustSource(rootCertificates: [root]).revocationPolicy == .crlPriority)
-        #expect(StaticListTrustSource(anchorsPerContext: [.wrpac: [root]]).revocationPolicy == .crlPriority)
+    @Test("New initializers default to OCSP only")
+    func defaultsToOcspOnly() {
+        #expect(EtsiTrustSource(loteLocations: Self.emptyLists).revocationPolicy == .ocspOnly)
+        #expect(StaticListTrustSource(rootCertificates: [root]).revocationPolicy == .ocspOnly)
+        #expect(StaticListTrustSource(anchorsPerContext: [.wrpac: [root]]).revocationPolicy == .ocspOnly)
     }
 
     @Test("Deprecated initializers map the legacy flag onto a policy")
@@ -75,8 +75,9 @@ struct PkixRevocationPolicyTests {
     @Test("Replacing the context type mappings keeps the revocation policy", arguments: PkixRevocationPolicy.allCases)
     func withContextTypeMappingsKeepsPolicy(policy: PkixRevocationPolicy) {
         let mappings: EtsiContextTypeMappings = ["org.iso.18013.5.1.mDL": .mdl]
-        let etsi = TrustSource.etsi(EtsiTrustSource(loteLocations: Self.emptyLists, revocationPolicy: policy))
-        let staticList = TrustSource.staticList(StaticListTrustSource(rootCertificates: [root], revocationPolicy: policy))
+        let checker = UnknownCrlChecker()
+        let etsi = TrustSource.etsi(EtsiTrustSource(loteLocations: Self.emptyLists, revocationPolicy: policy, crlChecker: checker))
+        let staticList = TrustSource.staticList(StaticListTrustSource(rootCertificates: [root], revocationPolicy: policy, crlChecker: checker))
         guard case .etsi(let copiedEtsi) = etsi.withContextTypeMappings(mappings),
               case .staticList(let copiedStatic) = staticList.withContextTypeMappings(mappings) else {
             Issue.record("withContextTypeMappings changed the trust source kind")
@@ -85,12 +86,14 @@ struct PkixRevocationPolicyTests {
         #expect(copiedEtsi.revocationPolicy == policy)
         #expect(copiedStatic.revocationPolicy == policy)
         #expect(copiedStatic.contextTypeMappings?["org.iso.18013.5.1.mDL"] == .mdl)
+        #expect(copiedEtsi.crlChecker === checker)
+        #expect(copiedStatic.crlChecker === checker)
     }
 
     @Test("Bundled anchors with CRL revocation reject a chain whose certificates publish no CRL")
     func crlOnlyRejectsChainWithoutCrl() async {
-        // The test certificates carry no CRL distribution point, so no positive CRL response can be obtained.
-        let source = TrustSource.staticList(StaticListTrustSource(rootCertificates: [root], revocationPolicy: .crlOnly))
+        // The test certificates carry no CRL distribution point, so the CRL checker cannot establish a status.
+        let source = TrustSource.staticList(StaticListTrustSource(rootCertificates: [root], revocationPolicy: .crlOnly, crlChecker: UnknownCrlChecker()))
         let manager = EtsiTrustManager(source: source, defaultVerificationContext: EtsiContextType.wrpac.verificationContext)
         let (isTrusted, _) = await manager.validateCertTrustPath(chain: [leaf])
         #expect(!isTrusted)
@@ -124,6 +127,13 @@ private struct LegacySources {
 
     func isRevocationEnabled(_ source: StaticListTrustSource) -> Bool {
         source.isRevocationEnabled
+    }
+}
+
+/// A CRL checker that never establishes a status, as for certificates without a CRL distribution point.
+final class UnknownCrlChecker: NSObject, CheckRevocationIos {
+    func invoke(certificate: Data, issuer: Data) -> any IosRevocationStatus {
+        IosRevocationStatusUnknown(reason: "No CRL in test")
     }
 }
 #endif
