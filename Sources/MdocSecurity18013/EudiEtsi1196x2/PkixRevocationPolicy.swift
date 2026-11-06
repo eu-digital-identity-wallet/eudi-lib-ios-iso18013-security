@@ -53,13 +53,16 @@ public enum PkixRevocationPolicy: Sendable, CaseIterable {
         self = isRevocationEnabled ? .ocspOnly : .disabled
     }
 
-    /// A PKIX chain validator that checks revocation according to this policy.
-    func pkixValidator() -> ValidateCertificateChainUsingPKIXIos {
-        if let iosRevocationMethod {
-            ValidateCertificateChainUsingPKIXIos.companion.invoke(revocationMethod: iosRevocationMethod, isRevocationEnabled: true)
-        } else {
-            ValidateCertificateChainUsingPKIXIos.companion.invoke(isRevocationEnabled: false)
+    /// A PKIX chain validator that checks revocation according to this policy. Every policy that
+    /// uses CRLs needs `crlChecker`; without it the validator cannot be created.
+    func pkixValidator(crlChecker: (any CheckRevocationIos)?) -> ValidateCertificateChainUsingPKIXIos {
+        guard let iosRevocationMethod else {
+            return ValidateCertificateChainUsingPKIXIos.companion.invoke(isRevocationEnabled: false)
         }
+        if let crlChecker {
+            return ValidateCertificateChainUsingPKIXIos.companion.invoke(revocationMethod: iosRevocationMethod, checkCrlRevocation: crlChecker)
+        }
+        return ValidateCertificateChainUsingPKIXIos.companion.invoke(revocationMethod: iosRevocationMethod, isRevocationEnabled: true)
     }
 }
 #endif

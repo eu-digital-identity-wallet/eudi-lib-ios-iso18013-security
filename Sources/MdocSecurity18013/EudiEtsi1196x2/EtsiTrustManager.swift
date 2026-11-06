@@ -64,7 +64,7 @@ public final class EtsiTrustManager: @unchecked Sendable {
 
             let verifyJwtSignature: VerifyJwtSignature = etsi.customJwtSignatureVerifier ?? x5cVerifyJwtOrCwt.shared
             let directTrust = ValidateCertificateChainUsingDirectTrustIosKt.ValidateCertificateChainUsingDirectTrustIos
-            let pkix = etsi.revocationPolicy.pkixValidator()
+            let pkix = etsi.revocationPolicy.pkixValidator(crlChecker: etsi.crlChecker)
             let validator = if let loadLoTE = etsi.loadLoTE {
                 EudiwIosTrust.shared.cached(
                     urls: urls,
@@ -99,7 +99,7 @@ public final class EtsiTrustManager: @unchecked Sendable {
                 anchors: staticList.bundledAnchors,
                 method: staticList.method,
                 directTrust: ValidateCertificateChainUsingDirectTrustIosKt.ValidateCertificateChainUsingDirectTrustIos,
-                pkix: staticList.revocationPolicy.pkixValidator()
+                pkix: staticList.revocationPolicy.pkixValidator(crlChecker: staticList.crlChecker)
             )
             validateChain = { chain, context in
                 do {

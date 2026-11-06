@@ -35,6 +35,9 @@ public struct StaticListTrustSource: @unchecked Sendable {
     /// the anchors without a revocation check; every other policy requires a positive response
     /// from the configured CRL / OCSP method. Mirrors `EtsiTrustSource.revocationPolicy`.
     public let revocationPolicy: PkixRevocationPolicy
+    /// The client's CRL checker, required by every policy that uses CRLs (`.crlOnly`, `.crlPriority`,
+    /// `.ocspPriority`): the PKIX validator cannot be created for those policies without it.
+    public let crlChecker: (any CheckRevocationIos)?
 
     /// Whether chain validation checks revocation.
     @available(*, deprecated, message: "Use revocationPolicy instead")
@@ -44,12 +47,14 @@ public struct StaticListTrustSource: @unchecked Sendable {
         anchorsPerContext: [EtsiContextType: [Data]],
         method: BundledAnchorMethod = .pkix,
         contextTypeMappings: EtsiContextTypeMappings? = nil,
-        revocationPolicy: PkixRevocationPolicy = .crlPriority
+        revocationPolicy: PkixRevocationPolicy = .ocspOnly,
+        crlChecker: (any CheckRevocationIos)? = nil
     ) {
         self.anchorsPerContext = anchorsPerContext
         self.method = method
         self.contextTypeMappings = contextTypeMappings
         self.revocationPolicy = revocationPolicy
+        self.crlChecker = crlChecker
     }
 
     /// Convenience initializer for a single list of root certificates anchoring every context.
@@ -59,17 +64,20 @@ public struct StaticListTrustSource: @unchecked Sendable {
     ///   - method: the chain-validation strategy.
     ///   - contextTypeMappings: doc-type → context mappings.
     ///   - revocationPolicy: how chain validation checks revocation.
+    ///   - crlChecker: the client's CRL checker, required by every policy that uses CRLs.
     public init(
         rootCertificates: [Data],
         method: BundledAnchorMethod = .pkix,
         contextTypeMappings: EtsiContextTypeMappings? = nil,
-        revocationPolicy: PkixRevocationPolicy = .crlPriority
+        revocationPolicy: PkixRevocationPolicy = .ocspOnly,
+        crlChecker: (any CheckRevocationIos)? = nil
     ) {
         self.init(
             anchorsPerContext: Self.anchorsForEveryContext(rootCertificates),
             method: method,
             contextTypeMappings: contextTypeMappings,
-            revocationPolicy: revocationPolicy
+            revocationPolicy: revocationPolicy,
+            crlChecker: crlChecker
         )
     }
 
