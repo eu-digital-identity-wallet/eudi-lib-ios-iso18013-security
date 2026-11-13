@@ -56,7 +56,7 @@ public actor SecureEnclaveSecureArea: SecureArea {
         let initialUsageCounts = Array(repeating: 0, count: batchSize)
         let keyBatchInfo = KeyBatchInfo(keyOptions: keyOptions, usedCounts: initialUsageCounts, credentialPolicy: credentialOptions.credentialPolicy)
         guard let kbiData = keyBatchInfo.toData() else { throw SecureAreaError("Failed to encode KeyBatchInfo") }
-        let curveNameData = Self.defaultEcCurve.jwkName.data(using: .utf8)!
+        let curveNameData = try Self.defaultEcCurve.jwkName.data(using: .utf8)!
         let publicKey0Data = publicKeys.first!.x963Representation.base64EncodedString().data(using: .utf8)!
         let keyInfoRecord: [String: Data] = [
             kSecValueData as String: kbiData,
