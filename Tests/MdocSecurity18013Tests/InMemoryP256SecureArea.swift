@@ -53,7 +53,7 @@ public actor InMemoryP256SecureArea: SecureArea {
         let res = try await createKey(id: id, index: 0, keyOptions: keyOptions)
         return [res]
     }
-    
+
     public func getPublicKey(id: String, index: Int, curve: CoseEcCurve) async throws -> CoseKey {
         return CoseKey(crv: .P256, x963Representation: key.publicKey.x963Representation)
     }
@@ -63,11 +63,22 @@ public actor InMemoryP256SecureArea: SecureArea {
     public func deleteKeyInfo(id: String) async throws {}
 
     public func signature(id: String, index: Int, algorithm: MdocDataModel18013.SigningAlgorithm, dataToSign: Data, unlockData: Data? = nil) async throws -> Data {
+        try await signature(
+            id: id,
+            index: index,
+            algorithm: algorithm,
+            dataToSign: dataToSign,
+            unlockData: unlockData,
+            authenticationContext: ThreadSafeAuthContext()
+        )
+    }
+
+    public func signature(id: String, index: Int, algorithm: MdocDataModel18013.SigningAlgorithm, dataToSign: Data, unlockData: Data? = nil, authenticationContext: ThreadSafeAuthContext) async throws -> Data {
         let signature = try key.signature(for: dataToSign)
         return signature.rawRepresentation
     }
 
-    public func keyAgreement(id: String, index: Int, publicKey: MdocDataModel18013.CoseKey, unlockData: Data?) async throws -> SharedSecret {
+    public func keyAgreement(id: String, index: Int, publicKey: MdocDataModel18013.CoseKey, unlockData: Data?, authenticationContext: ThreadSafeAuthContext) async throws -> SharedSecret {
         let puk256 = try P256.KeyAgreement.PublicKey(x963Representation: publicKey.x963Representation)
         let prk256 = try P256.KeyAgreement.PrivateKey(x963Representation: key.x963Representation)
         let sharedSecret = try prk256.sharedSecretFromKeyAgreement(with: puk256)
@@ -75,7 +86,7 @@ public actor InMemoryP256SecureArea: SecureArea {
     }
 
     public func getKeyBatchInfo(id: String) async throws -> MdocDataModel18013.KeyBatchInfo {
-        KeyBatchInfo(secureAreaName: Self.name, crv: .P256, usedCounts: [0], credentialPolicy: .rotateUse)
+        KeyBatchInfo(keyOptions: KeyOptions(curve: .P256, secureAreaName: Self.name), usedCounts: [0], credentialPolicy: .rotateUse)
     }
 }
 
@@ -86,6 +97,8 @@ public actor DummySecureKeyStorage: MdocDataModel18013.SecureKeyStorage {
     public func readKeyInfo(id: String) async throws -> [String : Data] { [:] }
 
     public func readKeyData(id: String, index: Int) async throws -> [String : Data] { [:] }
+
+    public func readKeyData(id: String, index: Int, authenticationContext: ThreadSafeAuthContext) async throws -> [String : Data] { [:] }
 
     public func writeKeyInfo(id: String, dict: [String : Data]) async throws {  }
 

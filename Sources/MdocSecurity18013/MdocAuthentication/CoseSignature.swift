@@ -25,7 +25,7 @@ extension Cose {
 	///   - deviceKey: static device private key (encoded with ANSI x.963 or stored in SE)
 	///   - alg: The algorithm to sign with
 	/// - Returns: a detached COSE-Sign1 structure
-    public static func makeDetachedCoseSign1(payloadData: Data, deviceKey: CoseKeyPrivate, alg: Cose.VerifyAlgorithm, unlockData: Data?) async throws -> Cose {
+    public static func makeDetachedCoseSign1(payloadData: Data, deviceKey: CoseKeyPrivate, alg: Cose.VerifyAlgorithm, unlockData: Data?, authenticationContext: ThreadSafeAuthContext) async throws -> Cose {
 		let coseIn = Cose(type: .sign1, algorithm: alg.rawValue, payloadData: payloadData)
 		let dataToSign = coseIn.signatureStruct!
 		let signature = try await deviceKey.secureArea.signature(
@@ -33,8 +33,9 @@ extension Cose {
 			index: deviceKey.index,
 			algorithm: alg.signingAlgorithm,
 			dataToSign: dataToSign,
-			unlockData: unlockData
-		)
+            unlockData: unlockData,
+            authenticationContext: authenticationContext
+        )
 		// return COSE_SIGN1 struct
         return Cose(type: .sign1, algorithm: alg.rawValue, signature: signature)
 	}
@@ -55,7 +56,7 @@ extension Cose {
 			return false
 		}
 		switch verifyAlgorithm {
-		case .es256:
+		case .es256, .esp256:
 			let signingPubKey = try P256.Signing.PublicKey(x963Representation: publicKey_x963)
 			let ecdsaSignature = try P256.Signing.ECDSASignature(rawRepresentation: signature)
 			isValidSignature = signingPubKey.isValidSignature(ecdsaSignature, for: signatureStruct)

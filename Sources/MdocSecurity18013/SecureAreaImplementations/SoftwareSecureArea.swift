@@ -16,6 +16,7 @@
 
 import Foundation
 import CryptoKit
+@preconcurrency import LocalAuthentication
 import Security
 import MdocDataModel18013
 /// Software secure area
@@ -51,13 +52,10 @@ public actor SoftwareSecureArea: SecureArea {
         }
     }
 
-    public func createKeyBatch(
-        id: String,
-        credentialOptions: CredentialOptions,
-        keyOptions: KeyOptions?
-    ) async throws -> [CoseKey] {
+    public func createKeyBatch(id: String, credentialOptions: CredentialOptions, keyOptions: KeyOptions?) async throws -> [CoseKey] {
         let ecCurve = keyOptions?.curve ?? .P256
         let batchSize = credentialOptions.batchSize
+        if batchSize <= 0 { throw SecureAreaError("Batch size must be greater than 0") }
         var publicKeys: [CoseKey] = []
         publicKeys.reserveCapacity(batchSize)
         var privateKeyRecords = [[String: Data]]()
@@ -68,30 +66,32 @@ public actor SoftwareSecureArea: SecureArea {
             publicKeys.append(CoseKey(crv: ecCurve, x963Representation: x963Pub))
         }
         let initialUsageCounts = Array(repeating: 0, count: batchSize)
-        let kbi = KeyBatchInfo(
-            secureAreaName: Self.name,
-            crv: ecCurve,
-            usedCounts: initialUsageCounts,
-            credentialPolicy: credentialOptions.credentialPolicy
-        )
-        guard let kbiData = kbi.toData() else { throw SecureAreaError("Failed to encode KeyBatchInfo") }
+        let keyBatchInfo = KeyBatchInfo(keyOptions: keyOptions, usedCounts: initialUsageCounts, credentialPolicy: credentialOptions.credentialPolicy)
+        guard let kbiData = keyBatchInfo.toData() else { throw SecureAreaError("Failed to encode KeyBatchInfo") }
         let curveNameData = ecCurve.jwkName.data(using: .utf8)!
+        let publicKey0Data = publicKeys.first!.x963Representation.base64EncodedString().data(using: .utf8)!
         let keyInfoRecord: [String: Data] = [
             kSecValueData as String: kbiData,
             kSecAttrDescription as String: curveNameData,
+            kSecAttrComment as String: publicKey0Data,
         ]
         try await storage.writeKeyInfo(id: id, dict: keyInfoRecord)
-        try await storage.writeKeyDataBatch(
-            id: id,
-            startIndex: 0,
-            dicts: privateKeyRecords,
-            keyOptions: keyOptions
-        )
+        try await storage.writeKeyDataBatch(id: id, startIndex: 0, dicts: privateKeyRecords, keyOptions: keyOptions)
         return publicKeys
     }
-    
+
     public func getPublicKey(id: String, index: Int, curve: CoseEcCurve) async throws -> CoseKey {
-        let x963Priv = try await getKeyData(id: id, index: index)
+        switch curve { case .P256, .P384, .P521: break
+        default: throw SecureAreaError("Unsupported curve \(curve)")
+        }
+        let keyInfo = try await storage.readKeyInfo(id: id)
+        guard let publicKey0DataEnc = keyInfo[kSecAttrComment as String], !publicKey0DataEnc.isEmpty, let publicKey0DataBase64 = String(data: publicKey0DataEnc, encoding: .utf8), let publicKey0Data = Data(base64Encoded: publicKey0DataBase64) else {
+            throw SecureAreaError("Public key info not found")
+        }
+        if index == 0 {
+            return CoseKey(crv: curve, x963Representation: publicKey0Data)
+        }
+        let x963Priv = try await getPrivateKeyData(id: id, index: index, authenticationContext: ThreadSafeAuthContext())
         switch curve {
         case .P256:
             let privKey = try P256.Signing.PrivateKey(x963Representation: x963Priv)
@@ -112,15 +112,9 @@ public actor SoftwareSecureArea: SecureArea {
     public func deleteKeyInfo(id: String) async throws {
         try await storage.deleteKeyInfo(id: id)
     }
-    /// compute signature
-    public func signature(
-        id: String,
-        index: Int,
-        algorithm: SigningAlgorithm,
-        dataToSign: Data,
-        unlockData: Data?
-    ) async throws -> Data {
-        let x963Priv = try await getKeyData(id: id, index: index)
+
+    public func signature(id: String, index: Int, algorithm: SigningAlgorithm, dataToSign: Data, unlockData: Data?, authenticationContext: ThreadSafeAuthContext) async throws -> Data {
+        let x963Priv = try await getPrivateKeyData(id: id, index: index, authenticationContext: authenticationContext)
         switch algorithm {
         case .ES256:
             let signingKey = try P256.Signing.PrivateKey(x963Representation: x963Priv)
@@ -142,15 +136,10 @@ public actor SoftwareSecureArea: SecureArea {
     }
 
     /// make shared secret with other public key
-    public func keyAgreement(
-        id: String,
-        index: Int,
-        publicKey: CoseKey,
-        unlockData: Data?
-    ) async throws -> SharedSecret {
+    public func keyAgreement(id: String, index: Int, publicKey: CoseKey, unlockData: Data?, authenticationContext: ThreadSafeAuthContext) async throws -> SharedSecret {
         let sharedSecret: SharedSecret
         let (_, curve) = try await getInfoAndCurve(id: id)
-        let x963Priv = try await getKeyData(id: id, index: index)
+        let x963Priv = try await getPrivateKeyData(id: id, index: index, authenticationContext: authenticationContext)
         switch curve {
         case .P256:
             let puk256 = try P256.KeyAgreement.PublicKey(x963Representation: publicKey.x963Representation)
@@ -172,8 +161,8 @@ public actor SoftwareSecureArea: SecureArea {
         return sharedSecret
     }
 
-    func getKeyData(id: String, index: Int) async throws -> Data {
-        let keyDataDict = try await storage.readKeyData(id: id, index: index)
+    func getPrivateKeyData(id: String, index: Int, authenticationContext: ThreadSafeAuthContext) async throws -> Data {
+        let keyDataDict = try await storage.readKeyData(id: id, index: index, authenticationContext: authenticationContext)
         guard let x963Representation = keyDataDict[kSecValueData as String] else {
             throw SecureAreaError("Key data not found")
         }

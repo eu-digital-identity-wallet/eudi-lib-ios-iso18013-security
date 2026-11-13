@@ -63,20 +63,21 @@ struct CertificateHandlingTests {
 	func isMdocX5cValidNoRoots() throws {
 		let leafCert = try #require(eudiIaca.first)
 		let (isValid, messages, rootCert) = SecurityHelpers.isMdocX5cValid(
-			secCerts: [leafCert], usage: .mdocReaderAuth, revocationPolicy: .hardFail, rootIaca: [])
+			secCerts: [leafCert], usage: .mdocAuth, revocationPolicy: .hardFail, rootIaca: [])
 		#expect(!isValid)
 		#expect(rootCert == nil)
 		#expect(messages.contains(where: { $0.contains("not matched with root certificates") }))
 		print("No roots messages:", messages)
 	}
 
-	@Test("isMdocX5cValid succeeds with self-signed root IACA certificate")
+	@Test("isMdocX5cValid rejects a CA certificate used for reader authentication")
 	func isMdocX5cValidSelfSignedRoot() throws {
 		let leafCert = try #require(eudiIaca.first)
 		// Use the same cert as a "root" — it is self-signed
 		let (isValid, messages, _) = SecurityHelpers.isMdocX5cValid(secCerts: [leafCert], usage: .mdocReaderAuth, revocationPolicy: .hardFail, rootIaca: [eudiIaca])
-		// The cert is self signed
-		#expect(isValid)
+		// Trusting the CA does not authorize it for reader authentication.
+		#expect(!isValid)
+		#expect(messages.contains(where: { $0.contains("mdlReaderAuth") }))
 		print("Messages:", messages)
 	}
 

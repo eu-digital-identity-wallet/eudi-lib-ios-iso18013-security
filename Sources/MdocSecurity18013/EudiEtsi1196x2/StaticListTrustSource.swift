@@ -31,33 +31,92 @@ public struct StaticListTrustSource: @unchecked Sendable {
     public let method: BundledAnchorMethod
     /// Doc-type → context mappings used to select the verification context per document.
     public let contextTypeMappings: EtsiContextTypeMappings?
+    /// How chain validation checks revocation. With `.disabled` the chain is evaluated against
+    /// the anchors without a revocation check; every other policy requires a positive response
+    /// from the configured CRL / OCSP method. Mirrors `EtsiTrustSource.revocationPolicy`.
+    public let revocationPolicy: PkixRevocationPolicy
+    /// The client's CRL checker, required by every policy that uses CRLs (`.crlOnly`, `.crlPriority`,
+    /// `.ocspPriority`): the PKIX validator cannot be created for those policies without it.
+    public let crlChecker: (any CheckRevocationIos)?
+
+    /// Whether chain validation checks revocation.
+    @available(*, deprecated, message: "Use revocationPolicy instead")
+    public var isRevocationEnabled: Bool { revocationPolicy.isEnabled }
 
     public init(
         anchorsPerContext: [EtsiContextType: [Data]],
         method: BundledAnchorMethod = .pkix,
-        contextTypeMappings: EtsiContextTypeMappings? = nil
+        contextTypeMappings: EtsiContextTypeMappings? = nil,
+        revocationPolicy: PkixRevocationPolicy = .ocspOnly,
+        crlChecker: (any CheckRevocationIos)? = nil
     ) {
         self.anchorsPerContext = anchorsPerContext
         self.method = method
         self.contextTypeMappings = contextTypeMappings
+        self.revocationPolicy = revocationPolicy
+        self.crlChecker = crlChecker
     }
 
-    /// Convenience initializer for a single list of root certificates anchoring one context.
+    /// Convenience initializer for a single list of root certificates anchoring every context.
     ///
     /// - Parameters:
     ///   - rootCertificates: DER-encoded anchor certificates.
-    ///   - context: the verification context these anchors apply to (default: WRPAC, the
-    ///     Wallet Relying Party access certificate a reader presents).
+    ///   - method: the chain-validation strategy.
+    ///   - contextTypeMappings: doc-type → context mappings.
+    ///   - revocationPolicy: how chain validation checks revocation.
+    ///   - crlChecker: the client's CRL checker, required by every policy that uses CRLs.
     public init(
         rootCertificates: [Data],
         method: BundledAnchorMethod = .pkix,
-        contextTypeMappings: EtsiContextTypeMappings? = nil
+        contextTypeMappings: EtsiContextTypeMappings? = nil,
+        revocationPolicy: PkixRevocationPolicy = .ocspOnly,
+        crlChecker: (any CheckRevocationIos)? = nil
     ) {
         self.init(
-            anchorsPerContext: [.pid: rootCertificates, .mdl: rootCertificates, .wallet: rootCertificates, .wrpac: rootCertificates, .wrprc: rootCertificates],
+            anchorsPerContext: Self.anchorsForEveryContext(rootCertificates),
             method: method,
-            contextTypeMappings: contextTypeMappings
+            contextTypeMappings: contextTypeMappings,
+            revocationPolicy: revocationPolicy,
+            crlChecker: crlChecker
         )
+    }
+
+    /// Creates a source from the legacy revocation flag: `true` requires a positive OCSP response
+    /// (`.ocspOnly`), `false` skips the revocation check (`.disabled`).
+    @available(*, deprecated, message: "Use init(anchorsPerContext:method:contextTypeMappings:revocationPolicy:) instead")
+    public init(
+        anchorsPerContext: [EtsiContextType: [Data]],
+        method: BundledAnchorMethod = .pkix,
+        contextTypeMappings: EtsiContextTypeMappings? = nil,
+        isRevocationEnabled: Bool
+    ) {
+        self.init(
+            anchorsPerContext: anchorsPerContext,
+            method: method,
+            contextTypeMappings: contextTypeMappings,
+            revocationPolicy: PkixRevocationPolicy(isRevocationEnabled: isRevocationEnabled)
+        )
+    }
+
+    /// Creates a source from the legacy revocation flag: `true` requires a positive OCSP response
+    /// (`.ocspOnly`), `false` skips the revocation check (`.disabled`).
+    @available(*, deprecated, message: "Use init(rootCertificates:method:contextTypeMappings:revocationPolicy:) instead")
+    public init(
+        rootCertificates: [Data],
+        method: BundledAnchorMethod = .pkix,
+        contextTypeMappings: EtsiContextTypeMappings? = nil,
+        isRevocationEnabled: Bool
+    ) {
+        self.init(
+            anchorsPerContext: Self.anchorsForEveryContext(rootCertificates),
+            method: method,
+            contextTypeMappings: contextTypeMappings,
+            revocationPolicy: PkixRevocationPolicy(isRevocationEnabled: isRevocationEnabled)
+        )
+    }
+
+    private static func anchorsForEveryContext(_ rootCertificates: [Data]) -> [EtsiContextType: [Data]] {
+        [.pid: rootCertificates, .mdl: rootCertificates, .wallet: rootCertificates, .wrpac: rootCertificates, .wrprc: rootCertificates]
     }
 
     /// Builds the `BundledAnchors` payload for `EudiwIosTrust.usingBundledAnchors`.

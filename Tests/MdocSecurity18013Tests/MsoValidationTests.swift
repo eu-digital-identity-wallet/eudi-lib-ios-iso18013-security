@@ -46,7 +46,7 @@ struct MsoValidationTests {
             verifyAlgorithm: issuerSigned.issuerAuth.verifyAlgorithm,
             signature: issuerSigned.issuerAuth.signature,
             x5chain: issuerSigned.issuerAuth.x5chain,
-            statusIdentifier: issuerSigned.issuerAuth.statusIdentifier
+            statusList: issuerSigned.issuerAuth.statusList
         )
         return IssuerSigned(issuerNameSpaces: issuerSigned.issuerNameSpaces, issuerAuth: issuerAuthUpdated)
     }

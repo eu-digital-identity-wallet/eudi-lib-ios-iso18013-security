@@ -17,12 +17,63 @@ import Foundation
 import Testing
 import SwiftCBOR
 import Security
+import CryptoKit
 
 @testable import MdocDataModel18013
 @testable import MdocSecurity18013
 
 @Suite("MdocSecurity18013 Tests")
 struct MdocSecurity18013Tests {
+
+    @Test("Validate detached P-256 signatures", arguments: [Cose.VerifyAlgorithm.es256, .esp256])
+    func validateDetachedP256Signature(algorithm: Cose.VerifyAlgorithm) throws {
+        let privateKey = P256.Signing.PrivateKey()
+        let payload = Data("device authentication".utf8)
+        let coseWithPayload = Cose(type: .sign1, algorithm: algorithm.rawValue, payloadData: payload)
+        let signatureStruct = try #require(coseWithPayload.signatureStruct)
+        let signature = try privateKey.signature(for: signatureStruct)
+        let detachedCose = Cose(type: .sign1, algorithm: algorithm.rawValue, signature: signature.rawRepresentation)
+        let publicKey = privateKey.publicKey.x963Representation
+
+        #expect(try detachedCose.validateDetachedCoseSign1(payloadData: payload, publicKey_x963: publicKey))
+        #expect(try !detachedCose.validateDetachedCoseSign1(payloadData: Data("tampered payload".utf8), publicKey_x963: publicKey))
+    }
+
+
+    @Test("Transfer signatures use the selected algorithm", arguments: [nil, Cose.VerifyAlgorithm.es256, .esp256])
+    func transferSignatureAlgorithm(algorithm: Cose.VerifyAlgorithm?) async throws {
+        let (_, sessionEncryption) = try #require(try makeSessionEncryptionFromAnnexData())
+        var deviceKey = Self.AnnexdTestData.d53_deviceKey
+        let publicKey = try await deviceKey.key
+        let authentication = MdocAuthentication(
+            sessionTranscript: sessionEncryption.sessionTranscript,
+            authKeys: CoseKeyExchange(publicKey: nil, privateKey: deviceKey))
+        let deviceAuth: DeviceAuth?
+        if let algorithm {
+            deviceAuth = try await authentication.getDeviceAuthForTransfer(
+                docType: "org.iso.18013.5.1.mDL",
+                dauthMethod: .deviceSignature,
+                signatureAlgorithm: algorithm,
+                deviceNameSpaces: nil,
+                unlockData: nil,
+                authenticationContext: ThreadSafeAuthContext())
+        } else {
+            deviceAuth = try await authentication.getDeviceAuthForTransfer(
+                docType: "org.iso.18013.5.1.mDL",
+                dauthMethod: .deviceSignature,
+                deviceNameSpaces: nil,
+                unlockData: nil,
+                authenticationContext: ThreadSafeAuthContext())
+        }
+        let cose = try #require(deviceAuth).coseMacOrSignature
+        #expect(cose.verifyAlgorithm == (algorithm ?? .es256))
+        let payload = DeviceAuthentication(
+            sessionTranscript: sessionEncryption.sessionTranscript,
+            docType: "org.iso.18013.5.1.mDL",
+            deviceNameSpaces: nil)
+            .toCBOR(options: CBOROptions()).taggedEncoded.encode(options: CBOROptions())
+        #expect(try cose.validateDetachedCoseSign1(payloadData: Data(payload), publicKey_x963: publicKey.x963Representation))
+    }
 
     @Test("Decode session transcript from annex D.5.1")
     func decodeSessionTranscriptAnnexD51() throws {
@@ -63,7 +114,7 @@ struct MdocSecurity18013Tests {
         let se: SessionEstablishment = try SessionEstablishment(cbor: dse)
         var de = try DeviceEngagement(data: transcript.devEngRawData!)
         de.privateKey = Self.AnnexdTestData.d51_ephDeviceKey
-        var sessionEncr = try #require(SessionEncryption(se: se, de: de, handOver: transcript.handOver))
+        var sessionEncr = try #require(SessionEncryption(se: se, de: de, handOver: transcript.handOver, authenticationContext: ThreadSafeAuthContext()))
 		sessionEncr.deviceEngagementRawData = try #require(transcript.devEngRawData) // cbor encoding differs between implemenentations, for mDL with our own implementation they will be identical
         return (se, sessionEncr)
     }
@@ -103,7 +154,8 @@ struct MdocSecurity18013Tests {
             docType: "org.iso.18013.5.1.mDL",
             dauthMethod: bUseDeviceSign ? .deviceSignature : .deviceMac,
             deviceNameSpaces: nil,
-            unlockData: nil)
+            unlockData: nil,
+            authenticationContext: ThreadSafeAuthContext())
 		let deviceAuth = try #require(dAuthO)
         let ourDeviceAuthCBORbytes = deviceAuth.encode(options: CBOROptions())
         #expect(Data(ourDeviceAuthCBORbytes) == AnnexdTestData.d53_deviceAuthCBORdata)
@@ -138,7 +190,7 @@ struct MdocSecurity18013Tests {
             print(message ?? "Reader auth certificate chain is trusted")
 		}
 	}
- 
+
 }
 
 

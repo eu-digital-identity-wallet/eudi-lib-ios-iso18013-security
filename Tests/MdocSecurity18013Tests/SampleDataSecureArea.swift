@@ -60,7 +60,7 @@ actor SampleDataSecureArea: SecureArea {
             x963Priv = key.x963Representation; x963Pub = key.publicKey.x963Representation
         default: throw SecureAreaError("Unsupported curve \(curve)")
         }
-        let kbi = KeyBatchInfo(secureAreaName: Self.name, crv: curve, usedCounts: [0], credentialPolicy: .rotateUse)
+        let kbi = KeyBatchInfo(keyOptions: keyOptions ?? KeyOptions(curve: curve, secureAreaName: Self.name), usedCounts: [0], credentialPolicy: .rotateUse)
         guard let kbiData = kbi.toData() else { throw SecureAreaError("Failed to encode KeyBatchInfo") }
         try await storage.writeKeyInfo(id: id, dict: [kSecValueData as String: kbiData, kSecAttrDescription as String: curve.jwkName.data(using: .utf8)!])
         try await storage.writeKeyDataBatch(id: id, startIndex: 0, dicts: [[kSecValueData as String: x963Priv]], keyOptions: keyOptions)
@@ -76,14 +76,14 @@ actor SampleDataSecureArea: SecureArea {
         try await storage.deleteKeyBatch(id: id, startIndex: startIndex, batchSize: batchSize)
     }
 
-    func signature(id: String, index: Int, algorithm: SigningAlgorithm, dataToSign: Data, unlockData: Data?) async throws -> Data {
+    func signature(id: String, index: Int, algorithm: SigningAlgorithm, dataToSign: Data, unlockData: Data?, authenticationContext: ThreadSafeAuthContext) async throws -> Data {
         let softwareSA = SoftwareSecureArea(storage: storage)
-        return try await softwareSA.signature(id: id, index: index, algorithm: algorithm, dataToSign: dataToSign, unlockData: unlockData)
+        return try await softwareSA.signature(id: id, index: index, algorithm: algorithm, dataToSign: dataToSign, unlockData: unlockData, authenticationContext: authenticationContext)
     }
 
-    func keyAgreement(id: String, index: Int, publicKey: CoseKey, unlockData: Data?) async throws -> SharedSecret {
+    func keyAgreement(id: String, index: Int, publicKey: CoseKey, unlockData: Data?, authenticationContext: ThreadSafeAuthContext) async throws -> SharedSecret {
         let softwareSA = SoftwareSecureArea(storage: storage)
-        return try await softwareSA.keyAgreement(id: id, index: index, publicKey: publicKey, unlockData: unlockData)
+        return try await softwareSA.keyAgreement(id: id, index: index, publicKey: publicKey, unlockData: unlockData, authenticationContext: authenticationContext)
     }
 
     func getKeyBatchInfo(id: String) async throws -> KeyBatchInfo {

@@ -31,6 +31,11 @@ public struct EtsiTrustSource: @unchecked Sendable {
     /// Optional custom JWT signature verifier for LoTE JWTs; when `nil`, the core uses
     /// its built-in verifier.
     public let customJwtSignatureVerifier: (any VerifyJwtSignature)?
+    /// Optional custom LoTE loader; when `nil`, the core fetches each LoTE with the built-in
+    /// downloader. Use it to fetch LoTEs through your own HTTP stack or to serve locally
+    /// persisted copies (e.g. for offline proximity presentation). Whatever the loader returns
+    /// still goes through JWT signature verification and expiry checks.
+    public let loadLoTE: (any IosLoadLoTE)?
     /// Controls whether additional LoTE pointers are followed.
     public let loteConstraints: any LoadLoTEAndPointersConstraints
 
@@ -40,38 +45,63 @@ public struct EtsiTrustSource: @unchecked Sendable {
     /// `cacheTtlHours` expressed in hours, for the `EudiwIosTrust.cached(ttlHours:)` boundary.
     public let cacheTtlHours: Double
 
+    /// How PKIX certificate validation checks revocation.
+    public let revocationPolicy: PkixRevocationPolicy
+    /// The client's CRL checker, required by every policy that uses CRLs (`.crlOnly`, `.crlPriority`,
+    /// `.ocspPriority`): the PKIX validator cannot be created for those policies without it.
+    public let crlChecker: (any CheckRevocationIos)?
+
+    /// Whether PKIX certificate validation checks revocation.
+    @available(*, deprecated, message: "Use revocationPolicy instead")
+    public var isRevocationEnabled: Bool { revocationPolicy.isEnabled }
+
     public init(
         loteLocations: SupportedLists<NSString>,
         contextTypeMappings: EtsiContextTypeMappings? = nil,
         cacheTtlHours: TimeInterval = EtsiTrustSource.defaultCacheTtlHours,
         customJwtSignatureVerifier: (any VerifyJwtSignature)? = nil,
-        loteConstraints: any LoadLoTEAndPointersConstraints = LoadLoTEAndPointersConstraintsDoNotLoadOtherPointers.shared
+        loadLoTE: (any IosLoadLoTE)? = nil,
+        loteConstraints: any LoadLoTEAndPointersConstraints = LoadLoTEAndPointersConstraintsDoNotLoadOtherPointers.shared,
+        revocationPolicy: PkixRevocationPolicy = .ocspOnly,
+        crlChecker: (any CheckRevocationIos)? = nil
     ) {
         self.loteLocations = loteLocations
         self.contextTypeMappings = contextTypeMappings
         self.cacheTtlHours = cacheTtlHours
         self.customJwtSignatureVerifier = customJwtSignatureVerifier
+        self.loadLoTE = loadLoTE
         self.loteConstraints = loteConstraints
+        self.revocationPolicy = revocationPolicy
+        self.crlChecker = crlChecker
+    }
+
+    /// Creates a source from the legacy revocation flag: `true` checks revocation with OCSP only
+    /// (`.ocspOnly`), `false` disables it (`.disabled`).
+    @available(*, deprecated, message: "Use init(loteLocations:contextTypeMappings:cacheTtlHours:customJwtSignatureVerifier:loadLoTE:loteConstraints:revocationPolicy:) instead")
+    public init(
+        loteLocations: SupportedLists<NSString>,
+        contextTypeMappings: EtsiContextTypeMappings? = nil,
+        cacheTtlHours: TimeInterval = EtsiTrustSource.defaultCacheTtlHours,
+        customJwtSignatureVerifier: (any VerifyJwtSignature)? = nil,
+        loadLoTE: (any IosLoadLoTE)? = nil,
+        loteConstraints: any LoadLoTEAndPointersConstraints = LoadLoTEAndPointersConstraintsDoNotLoadOtherPointers.shared,
+        isRevocationEnabled: Bool
+    ) {
+        self.init(
+            loteLocations: loteLocations,
+            contextTypeMappings: contextTypeMappings,
+            cacheTtlHours: cacheTtlHours,
+            customJwtSignatureVerifier: customJwtSignatureVerifier,
+            loadLoTE: loadLoTE,
+            loteConstraints: loteConstraints,
+            revocationPolicy: PkixRevocationPolicy(isRevocationEnabled: isRevocationEnabled)
+        )
     }
 }
 
 // MARK: - Ready-made environment presets
 
 extension EtsiTrustSource {
-    /// LoTE trust lists for the EC DIGIT acceptance environment (PID, Wallet, WRPAC, mDL).
-    ///
-    /// certificate a reader presents. Build `EtsiTrustConfig` directly to target another context.
-    public static var digiTrust: Self { Self(loteLocations: SupportedLists<NSString>(
-                pidProviders: DIGITTrustLists.pidProviders as NSString,
-                walletProviders: DIGITTrustLists.walletProviders as NSString,
-                wrpacProviders: DIGITTrustLists.wrpacProviders as NSString,
-                wrprcProviders: nil,
-                pubEaaProviders: nil,
-                qeaProviders: nil,
-                eaaProviders: [EudiwIosTrust.shared.mdlUseCase: DIGITTrustLists.mdlProviders as NSString]
-            )
-        )
-    }
 
     /// LoTE trust lists for the EUDI Wallet Reference Implementation environment
     /// (PID, Wallet, WRPAC, WRPRC; no mDL list is published there).
@@ -82,10 +112,8 @@ extension EtsiTrustSource {
                 walletProviders: EUDIRefImplLists.walletProviders as NSString,
                 wrpacProviders: EUDIRefImplLists.wrpacProviders as NSString,
                 wrprcProviders: EUDIRefImplLists.wrprcProviders as NSString,
-                pubEaaProviders: nil,
-                qeaProviders: nil,
-                eaaProviders: [:]
-            )
+                pubEaaProviders: EUDIRefImplLists.pubEaaProviders as NSString,
+                qeaProviders: nil, eaaProviders: [:]), revocationPolicy: .disabled
         )
     }
 }

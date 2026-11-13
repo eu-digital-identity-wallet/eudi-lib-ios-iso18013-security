@@ -17,16 +17,6 @@ limitations under the License.
 #if canImport(EudiEtsi1196x2)
 import Foundation
 
-//  LoTE trust-list endpoints (EC DIGIT acceptance environment).
-struct DIGITTrustLists {
-    static let baseUrl = "https://acceptance.trust.tech.ec.europa.eu/lists/eudiw"
-
-    static let pidProviders = "\(baseUrl)/pid-providers.json"
-    static let walletProviders = "\(baseUrl)/wallet-providers.json"
-    static let wrpacProviders = "\(baseUrl)/wrpac-providers.json"
-    static let mdlProviders = "\(baseUrl)/mdl-providers.json"
-}
-
 // LoTE trust-list endpoints for the EUDI Wallet Reference Implementation environment.
 // No mDL list (the ref-impl env doesn't publish one); has WRPRC instead.
 struct EUDIRefImplLists {
@@ -36,5 +26,6 @@ struct EUDIRefImplLists {
     static let walletProviders = "\(baseUrl)/WalletProviders.jwt"
     static let wrpacProviders = "\(baseUrl)/WRPACProviders.jwt"
     static let wrprcProviders = "\(baseUrl)/WRPRCProviders.jwt"
+    static let pubEaaProviders = "\(baseUrl)/PubEAAProviders.jwt"
 }
 #endif
