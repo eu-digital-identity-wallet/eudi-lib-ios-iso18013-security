@@ -49,21 +49,41 @@ struct ReaderCertificateProfileTests {
         #expect(await issuer.createCertTrustPath(chain: [leaf]) != nil)
     }
 
-    @Test("A conforming reader leaf chains to its configured anchor")
-    func acceptsReaderThroughTrustAPI() async throws {
+    @Test("Reader trust binds leaf IAN to root SAN independently of leaf SAN",
+          arguments: ["absent", "matching", "mismatching", "missing", "malformed"])
+    func validatesReaderIssuerNamesThroughTrustAPI(_ binding: String) async throws {
         let key = P256.Signing.PrivateKey()
         let name = try DistinguishedName { CommonName("Reader test CA") }
+        let rootNames = SubjectAlternativeNames([.uniformResourceIdentifier("https://example.invalid/ca")])
+        var rootExtensions = [
+            try Certificate.Extension(BasicConstraints.isCertificateAuthority(maxPathLength: nil), critical: true),
+            try Certificate.Extension(KeyUsage(keyCertSign: true, cRLSign: true), critical: true)
+        ]
+        var leafExtensions = [Certificate.Extension]()
+        if binding != "absent" {
+            rootExtensions.append(try Certificate.Extension(rootNames, critical: false))
+            // The passing case has a distinct leaf SAN; failing cases have the root SAN.
+            let leafNames = binding == "matching" ?
+                SubjectAlternativeNames([.uniformResourceIdentifier("https://example.invalid/reader")]) : rootNames
+            leafExtensions.append(try Certificate.Extension(leafNames, critical: false))
+            if binding != "missing" {
+                let issuerNames = binding == "mismatching" ?
+                    SubjectAlternativeNames([.uniformResourceIdentifier("https://example.invalid/other-ca")]) : rootNames
+                let encodedNames = try Certificate.Extension(issuerNames, critical: false)
+                leafExtensions.append(Certificate.Extension(
+                    oid: [2, 5, 29, 18], critical: false,
+                    value: binding == "malformed" ? [0xff] : encodedNames.value
+                ))
+            }
+        }
         let root = try Certificate(
             version: .v3, serialNumber: 2, publicKey: .init(key.publicKey),
             notValidBefore: Date().addingTimeInterval(-3600),
             notValidAfter: Date().addingTimeInterval(3600), issuer: name, subject: name,
             signatureAlgorithm: .ecdsaWithSHA256,
-            extensions: Certificate.Extensions {
-                Critical(BasicConstraints.isCertificateAuthority(maxPathLength: nil))
-                Critical(KeyUsage(keyCertSign: true, cRLSign: true))
-            }, issuerPrivateKey: .init(key)
+            extensions: Certificate.Extensions(rootExtensions), issuerPrivateKey: .init(key)
         )
-        let leaf = try makeCertificate(issuerName: name, signingKey: key)
+        let leaf = try makeCertificate(issuerName: name, signingKey: key, additionalExtensions: leafExtensions)
         var rootSerializer = DER.Serializer()
         try rootSerializer.serialize(root)
         var leafSerializer = DER.Serializer()
@@ -72,20 +92,27 @@ struct ReaderCertificateProfileTests {
         let leafDER = Data(leafSerializer.serializedBytes)
         let source = SecTrustSource(rootIaca: [[rootDER]], usage: .mdocReaderAuth, revocationPolicy: .warning)
         let (valid, reason) = await source.validateCertTrustPath(chain: [leafDER])
-        #expect(valid, "\(reason ?? "")")
-        #expect(reason == nil)
-        #expect(await source.createCertTrustPath(chain: [leafDER]) == [leafDER, rootDER])
+        let expectedValid = binding == "absent" || binding == "matching"
+        #expect(valid == expectedValid, "\(reason ?? "")")
+        if expectedValid {
+            #expect(reason == nil)
+            #expect(await source.createCertTrustPath(chain: [leafDER]) == [leafDER, rootDER])
+        } else {
+            #expect(reason?.contains("Issuer data") == true)
+            #expect(await source.createCertTrustPath(chain: [leafDER]) == nil)
+        }
     }
 
     private func makeCertificate(
         violation: String? = nil,
         issuerName: DistinguishedName? = nil,
-        signingKey: P256.Signing.PrivateKey? = nil
+        signingKey: P256.Signing.PrivateKey? = nil,
+        additionalExtensions: [Certificate.Extension] = []
     ) throws -> Certificate {
         let key = P256.Signing.PrivateKey()
         let publicKey = Certificate.PublicKey(key.publicKey)
         let name = try DistinguishedName { CommonName("Reader profile test") }
-        var extensions = [Certificate.Extension]()
+        var extensions = additionalExtensions
         if violation != "akiMissing" {
             extensions.append(try Certificate.Extension(AuthorityKeyIdentifier(
                 keyIdentifier: violation == "akiEmpty" ? [] :
