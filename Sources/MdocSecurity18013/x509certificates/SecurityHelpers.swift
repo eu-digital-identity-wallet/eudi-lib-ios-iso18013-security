@@ -108,9 +108,10 @@ public class SecurityHelpers {
 					return (false, ["Current date not in validity period of Reader Root Certificate"], nil)
 				}
 				if usage == .mdocReaderAuth,
-				   let rootGeneralNames = x509root.getSubjectAlternativeNames(),
-				   let certificateGeneralNames = x509cert.getSubjectAlternativeNames() {
-					guard certificateGeneralNames.elementsEqual(rootGeneralNames) else {
+				   let rootGeneralNames = x509root.getSubjectAlternativeNames() {
+					// Annex B binds the issued certificate’s issuer names to the root’s subject names.
+					guard let issuerGeneralNames = x509cert.getIssuerAlternativeNames(),
+					      issuerGeneralNames.elementsEqual(rootGeneralNames) else {
 						return (false, ["Issuer data rfc822Name or uniformResourceIdentifier do not match with root cert."], nil)
 					}
 				}
