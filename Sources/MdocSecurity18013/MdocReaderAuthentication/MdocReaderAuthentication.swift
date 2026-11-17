@@ -28,13 +28,35 @@ public struct MdocReaderAuthentication: Sendable {
 
     let transcript: SessionTranscript
 
-	/// Validate the reader auth structure contained in the the reader's initial message
-	/// - Parameters:
-	///   - readerAuthCBOR: An untagged COSE-Sign1 structure containing the signature
-	///   - readerAuthCertificate: The reader auth certificate decoded from above
-	///     reader-auth structure. Contains the mdoc reader public key
-	///   - itemsRequestRawData: Reader's item request raw data
-	/// - Returns: (True if verification of reader auth has valid signature, reason for certificate validation failure)
+    /// Authentication failures are fatal, independently of certificate-trust policy.
+    public enum ReaderAuthenticationError: Error, LocalizedError, Equatable {
+        case invalidCertificate
+        case invalidStructure
+        case unsupportedAlgorithm
+        case missingPublicKey
+        case invalidSignature
+
+        public var errorDescription: String? {
+            switch self {
+            case .invalidCertificate: "Invalid reader authentication certificate chain"
+            case .invalidStructure: "Invalid reader authentication COSE-Sign1 structure"
+            case .unsupportedAlgorithm: "Unsupported reader authentication signature algorithm"
+            case .missingPublicKey: "Public key not found in reader authentication certificate"
+            case .invalidSignature: "Reader authentication signature validation failed"
+            }
+        }
+    }
+
+    /// Authenticates the reader's request, then evaluates certificate-chain trust.
+    /// - Parameters:
+    ///   - readerAuthCBOR: An untagged, detached COSE-Sign1 structure.
+    ///   - readerAuthX5c: DER certificate chain with the signing certificate first.
+    ///   - itemsRequestRawData: Original bytes of the reader's items request.
+    ///   - trustValidator: Certificate-chain trust evaluator.
+    /// - Returns: Certificate trust and its failure reason, only after signature verification succeeds.
+    /// - Throws: `ReaderAuthenticationError` for malformed authentication data or an invalid signature.
+    ///   Callers must treat these errors as fatal under every trust policy. Only a returned
+    ///   `false` trust result may be downgraded to a warning.
 	public func validateReaderAuth(
 		readerAuthCBOR: CBOR,
 		readerAuthX5c: [Data],
@@ -50,21 +72,36 @@ public struct MdocReaderAuthentication: Sendable {
 			.encode(options: CBOROptions())
 		let secCerts = readerAuthX5c.compactMap { SecCertificateCreateWithData(nil, $0 as CFData) }
 		let hasMatchingCertificateCount = !secCerts.isEmpty && secCerts.count == readerAuthX5c.count
-		guard hasMatchingCertificateCount else { return (false, "Invalid reader Auth Certificate") }
-		guard let readerAuthCose = Cose(type: .sign1, cbor: readerAuthCBOR) else {
-			return (false, "Invalid reader auth CBOR")
-		}
+		guard hasMatchingCertificateCount else { throw ReaderAuthenticationError.invalidCertificate }
+		guard case let .array(fields) = readerAuthCBOR, fields.count == 4,
+              case let .byteString(protectedBytes) = fields[0],
+              case .map = fields[1], case .null = fields[2],
+              let decodedHeaders = try? CBOR.decode(protectedBytes),
+              case let .map(headers) = decodedHeaders,
+              let readerAuthCose = Cose(type: .sign1, cbor: readerAuthCBOR) else {
+            throw ReaderAuthenticationError.invalidStructure
+        }
+        // The model's algorithm accessor does not distinguish positive and negative integers.
+        guard case let .negativeInt(algorithm) = headers[.unsignedInt(1)],
+              Cose.VerifyAlgorithm(rawValue: algorithm) != nil else {
+            throw ReaderAuthenticationError.unsupportedAlgorithm
+        }
 		guard let readerCertificate = secCerts.first,
 			  let readerPublicKeyX963 = SecurityHelpers.getPublicKeyx963(ref: readerCertificate) else {
-			return (false, "Public key not found in certificate")
+			throw ReaderAuthenticationError.missingPublicKey
 		}
-		let isSignatureValid = try readerAuthCose.validateDetachedCoseSign1(
-			payloadData: Data(contentBytes),
-			publicKey_x963: readerPublicKeyX963
-		)
-		guard isSignatureValid else { return (false, "Reader auth signature validation failed") }
-        let (trusted, failureReason) = await trustValidator.validateCertTrustPath(chain: readerAuthX5c)
-		return (isSignatureValid && trusted, failureReason)
+        let isSignatureValid: Bool
+        do {
+            isSignatureValid = try readerAuthCose.validateDetachedCoseSign1(
+                payloadData: Data(contentBytes),
+                publicKey_x963: readerPublicKeyX963
+            )
+        } catch {
+            // Malformed signatures and incompatible keys are authentication failures too.
+            throw ReaderAuthenticationError.invalidSignature
+        }
+        guard isSignatureValid else { throw ReaderAuthenticationError.invalidSignature }
+        return await trustValidator.validateCertTrustPath(chain: readerAuthX5c)
 	}
 
 	public init(transcript: SessionTranscript) {
