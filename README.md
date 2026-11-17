@@ -46,6 +46,14 @@ let ourDeviceAuthCBORbytes = deviceAuth.encode(options: CBOROptions())
 The data that the mdoc reader authenticates is the ReaderAuthentication structure
 Currently the mdoc side is implemented (verification of reader-auth CBOR data)
 
+`validateReaderAuth` throws `MdocReaderAuthentication.ReaderAuthenticationError` for malformed
+certificates or authentication data, unsupported algorithms, and invalid signatures. These errors
+must abort authentication under every trust policy; do not convert them to trust warnings.
+A returned `(false, reason)` means the signature is valid but the certificate chain is untrusted.
+Only this returned trust failure may be treated as a warning. Callers must invoke validation even
+when using a warning policy.
+
+
 ```swift
 let mdocAuth = MdocReaderAuthentication(transcript: sessionEncr.transcript)
 guard let readerAuthRawCBOR = docR.readerAuthRawCBOR else { continue }
