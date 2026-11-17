@@ -113,7 +113,7 @@ extension EtsiTrustSource {
                 wrpacProviders: EUDIRefImplLists.wrpacProviders as NSString,
                 wrprcProviders: EUDIRefImplLists.wrprcProviders as NSString,
                 pubEaaProviders: EUDIRefImplLists.pubEaaProviders as NSString,
-                qeaProviders: nil, eaaProviders: [:]), revocationPolicy: .disabled
+                qeaProviders: nil, eaaProviders: [:])
         )
     }
 }
