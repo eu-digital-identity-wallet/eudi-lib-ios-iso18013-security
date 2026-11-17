@@ -19,6 +19,7 @@ import Foundation
 import MdocDataModel18013
 import Security
 import JSONWebSignature
+import SwiftCBOR
 
 /// A ``VerifyJwtSignature`` implementation that verifies a LoTE JWS using the X.509
 /// certificate chain embedded in its `x5c` protected header (RFC 7515 §4.1.6).
@@ -72,6 +73,44 @@ public final class x5cVerifyJwtOrCwt: @unchecked Sendable {
         }
     }
 
+    /// CWT authentication failures are thrown separately from certificate-chain trust results.
+    public enum CwtVerificationError: Error {
+        case invalidStructure
+        case unsupportedAlgorithm
+        case missingKey
+        case invalidSignature
+    }
+
+    private static func verify(cwt readerAuth: ReaderAuth) throws {
+        let cose = readerAuth.coseSign1
+        guard cose.type == .sign1,
+              case let .byteString(headerBytes) = cose.protectedHeader.rawHeader,
+              case let .map(headers) = try CBOR.decode(headerBytes),
+              case let .byteString(payload) = cose.payload else {
+            throw CwtVerificationError.invalidStructure
+        }
+        // Check the signed algorithm's CBOR type as well as its value. The model's
+        // algorithm accessor alone does not distinguish positive and negative integers.
+        guard case let .negativeInt(algorithm) = headers[.unsignedInt(1)],
+              Cose.VerifyAlgorithm(rawValue: algorithm) != nil else {
+            throw CwtVerificationError.unsupportedAlgorithm
+        }
+        guard let leaf = readerAuth.x5chain.first,
+              let publicKey = SecurityHelpers.getPublicKeyx963(publicCertData: Data(leaf)) else {
+            throw CwtVerificationError.missingKey
+        }
+        // Preserve the original protected-header bytes when constructing Sig_structure.
+        // CryptoKit also rejects malformed signatures and keys incompatible with the algorithm.
+        guard !cose.signature.isEmpty,
+              try cose.validateDetachedCoseSign1(payloadData: Data(payload), publicKey_x963: publicKey) else {
+            throw CwtVerificationError.invalidSignature
+        }
+    }
+
+    /// Authenticates the token signature, then evaluates its certificate chain.
+    /// Signature/format failures throw for both formats; only chain-trust failures
+    /// are returned as `false`, so warning policies cannot downgrade invalid signatures.
+    /// CWTs must contain an embedded byte-string payload and a supported protected ECDSA algorithm.
     public static func validateTrust(_ attestToken: AttestToken, trustValidator: CertificateTrustValidator) async throws -> (Bool, String?) {
         let certsData: [Data]
         switch attestToken {
@@ -81,6 +120,7 @@ public final class x5cVerifyJwtOrCwt: @unchecked Sendable {
             certsData = b64certs.compactMap { Data(base64Encoded: $0) }
             guard certsData.count == b64certs.count else { throw JWS.JWSError.somethingWentWrong }
         case let .cwt(readerAuth):
+            try Self.verify(cwt: readerAuth)
             certsData = readerAuth.x5chain.map { Data($0) }
         }
         guard certsData.count > 0 else { throw JWS.JWSError.somethingWentWrong }
