@@ -21,12 +21,36 @@ import SwiftCBOR
 import X509
 
 extension IssuerSigned {
+    /// Validates an MSO, logging non-blocking issuer-trust failures.
+    /// Use the overload with `warnings` to also receive structured diagnostics.
     public func validate(
         docType: String,
         trustValidator: (any CertificateTrustValidator),
         trustPolicy: TrustPolicy,
         rejectIfValidUntilExceedsCertificateValidity: Bool = false,
         publicCoseKeys: inout [CoseKey]
+    ) async throws(MsoValidationError) {
+        var warnings: [MsoValidationError] = []
+        try await validate(
+            docType: docType,
+            trustValidator: trustValidator,
+            trustPolicy: trustPolicy,
+            rejectIfValidUntilExceedsCertificateValidity: rejectIfValidUntilExceedsCertificateValidity,
+            publicCoseKeys: &publicCoseKeys,
+            warnings: &warnings
+        )
+    }
+
+    /// Validates an MSO and appends non-blocking issuer-trust failures to `warnings`.
+    /// Existing warnings are preserved, including when another validation check throws.
+    /// Only issuer-trust failures are downgraded under `.warning`; all other checks remain blocking.
+    public func validate(
+        docType: String,
+        trustValidator: (any CertificateTrustValidator),
+        trustPolicy: TrustPolicy,
+        rejectIfValidUntilExceedsCertificateValidity: Bool = false,
+        publicCoseKeys: inout [CoseKey],
+        warnings: inout [MsoValidationError]
     ) async throws(MsoValidationError) {
         // Perform validation logic here
         let msoValidationRules: [(MobileSecurityObject) -> [MsoValidationError]?] =
@@ -41,7 +65,15 @@ extension IssuerSigned {
             errors.append(contentsOf: validityErrors)
         }
         if let trustErrors = await validateIssuerTrust(trustValidator: trustValidator) {
-            if trustPolicy == .enforce { errors.append(contentsOf: trustErrors) }
+            switch trustPolicy {
+            case .enforce:
+                errors.append(contentsOf: trustErrors)
+            case .warning:
+                warnings.append(contentsOf: trustErrors)
+                for warning in trustErrors {
+                    logger.warning("MSO issuer-trust failure is non-blocking under warning policy: \(warning.localizedDescription)")
+                }
+            }
         }
         let bindingKeyErrors = validateMsoSignature(publicCoseKeys: &publicCoseKeys)
         if let bindingKeyErrors { errors.append(contentsOf: bindingKeyErrors)}
