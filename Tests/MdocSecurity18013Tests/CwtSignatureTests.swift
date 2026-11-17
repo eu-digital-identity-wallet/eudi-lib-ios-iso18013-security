@@ -106,6 +106,21 @@ struct CwtSignatureTests {
         }
     }
 
+    @Test("Unsecured JWTs throw before trust")
+    func rejectsUnsecuredJwt() async throws {
+        let key = P256.Signing.PrivateKey()
+        let certificate = try certificateBytes(key: .init(key), publicKey: .init(key.publicKey), algorithm: .ecdsaWithSHA256)
+        let header = try JSONSerialization.data(withJSONObject: ["alg": "none", "x5c": [Data(certificate).base64EncodedString()]])
+        func base64URL(_ data: Data) -> String {
+            data.base64EncodedString().replacingOccurrences(of: "+", with: "-")
+                .replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+        }
+        let token = AttestToken.jwt(try JWS(jwsString: base64URL(header) + "." + base64URL(Data("{\"sub\":\"test\"}".utf8)) + "."))
+        await #expect(throws: (any Error).self) {
+            _ = try await x5cVerifyJwtOrCwt.validateTrust(token, trustValidator: TrustValidator(trusted: true, mustNotBeCalled: true))
+        }
+    }
+
     private func certificateBytes(key: Certificate.PrivateKey, publicKey: Certificate.PublicKey,
                                   algorithm: Certificate.SignatureAlgorithm) throws -> [UInt8] {
         let name = try DistinguishedName { CommonName("CWT signature test") }
