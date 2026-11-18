@@ -38,6 +38,34 @@ struct StaticListTrustSourceTests {
         #expect(matched == [type])
     }
 
+    @Test("Status anchors are independent of access and issuance anchors", arguments: [EtsiContextType.pidStatus, .mdlStatus, .qeaaStatus, .pubEaaStatus, .wrprcStatus], [PkixRevocationPolicy.disabled, .ocspOnly])
+    func statusAnchorsAreIsolated(context: EtsiContextType, revocation: PkixRevocationPolicy) async {
+        // Direct trust exercises both the offline and KMP bundled-anchor paths without network access.
+        let source = TrustSource.staticList(.init(anchorsPerContext: [context: [leaf]], method: .directTrust, revocationPolicy: revocation))
+        let status = EtsiTrustManager(source: source, defaultVerificationContext: context.verificationContext)
+        #expect(await status.validateCertTrustPath(chain: [leaf]).0)
+        let access = EtsiTrustManager(source: source, defaultVerificationContext: EtsiContextType.wrpac.verificationContext)
+        #expect(await !access.validateCertTrustPath(chain: [leaf]).0)
+        let issuance = EtsiTrustManager(source: source, defaultVerificationContext: context.bundledAnchorContext.verificationContext)
+        #expect(await !issuance.validateCertTrustPath(chain: [leaf]).0)
+        let accessOnly = TrustSource.staticList(.init(anchorsPerContext: [.wrpac: [leaf]], method: .directTrust, revocationPolicy: revocation))
+        let wrong = EtsiTrustManager(source: accessOnly, defaultVerificationContext: context.verificationContext)
+        #expect(await !wrong.validateCertTrustPath(chain: [leaf]).0)
+    }
+
+    @Test("mDL status anchors do not match a different EAA use case")
+    func rejectsOtherUseCase() {
+        #expect(!EtsiContextType.mdlStatus.matches(VerificationContextEAAStatus(useCase: "other")))
+    }
+
+    @Test("Root-certificate convenience initializer includes status contexts")
+    func rootCertificatesIncludeStatus() {
+        let source = StaticListTrustSource(rootCertificates: [root])
+        for context in EtsiContextType.allCases {
+            #expect(source.anchorsPerContext[context] == [root])
+        }
+    }
+
     @Test("A reader chain to a bundled anchor is trusted without a revocation check")
     func readerChainTrustedWithoutRevocation() async {
         let source = TrustSource.staticList(StaticListTrustSource(rootCertificates: [root], revocationPolicy: .disabled))

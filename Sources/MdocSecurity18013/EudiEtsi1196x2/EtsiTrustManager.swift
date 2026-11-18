@@ -95,15 +95,20 @@ public final class EtsiTrustManager: @unchecked Sendable {
             }
             cachedValidator = validator
         case .staticList(let staticList) where staticList.revocationPolicy.isEnabled:
-            let validator = EudiwIosTrust.shared.usingBundledAnchors(
-                anchors: staticList.bundledAnchors,
-                method: staticList.method,
-                directTrust: ValidateCertificateChainUsingDirectTrustIosKt.ValidateCertificateChainUsingDirectTrustIos,
-                pkix: staticList.revocationPolicy.pkixValidator(crlChecker: staticList.crlChecker)
-            )
+            let pkix = staticList.revocationPolicy.pkixValidator(crlChecker: staticList.crlChecker)
             validateChain = { chain, context in
+                guard let type = EtsiContextType.allCases.first(where: { $0.matches(context) }) else { return nil }
+                // This bridge performs PKIX/direct-trust validation without context-specific
+                // certificate profiles. Give it only the requested context's anchors; its
+                // issuance slots can then also represent independently configured status anchors.
+                let validator = EudiwIosTrust.shared.usingBundledAnchors(
+                    anchors: staticList.bundledAnchors(for: type),
+                    method: staticList.method,
+                    directTrust: ValidateCertificateChainUsingDirectTrustIosKt.ValidateCertificateChainUsingDirectTrustIos,
+                    pkix: pkix
+                )
                 do {
-                    let iosVal = try await EudiwIosTrust.shared.validate(validator: validator, chain: chain, context: context)
+                    let iosVal = try await EudiwIosTrust.shared.validate(validator: validator, chain: chain, context: type.bundledAnchorContext.verificationContext)
                     if let failReason = iosVal.failureReason { logger.warning("Bundled-anchors not trusted reason: \(failReason)")}
                     return iosVal
                 } catch {

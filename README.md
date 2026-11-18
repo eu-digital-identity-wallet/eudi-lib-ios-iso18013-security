@@ -60,6 +60,22 @@ guard let readerAuthRawCBOR = docR.readerAuthRawCBOR else { continue }
 let b = try await mdocAuth.validateReaderAuth(readerAuthCBOR: readerAuthRawCBOR, readerAuthX5c: docR.readerCertificates, itemsRequestRawData: docR.itemsRequestRawData!)
 ```
 
+## ETSI status-list trust
+
+On iOS, select the status-signing context for the credential or registration certificate being checked:
+
+| Owner context | Status context |
+| --- | --- |
+| `.pid` | `.pidStatus` |
+| `.mdl` | `.mdlStatus` (EAA status for the mDL use case) |
+| `.qeaa` | `.qeaaStatus` |
+| `.pubEaa` | `.pubEaaStatus` |
+| `.wrprc` | `.wrprcStatus` |
+
+`EtsiContextType.statusContext` returns this mapping. WRPAC and wallet-provider attestation contexts have no document-status mapping. Use the resulting `verificationContext` when constructing a status trust manager.
+
+For static trust sources, `anchorsPerContext` keeps status-signing anchors separate from issuance and WRPAC anchors. Configure the status cases explicitly, or use `rootCertificates` to trust the same anchors in every context. The configured PKIX revocation policy also applies to status certificate chains.
+
 ## Dependencies (to other libs)
 
 * ASN1 DER Decoder for X.509 Certificate [ASN1Decoder](https://github.com/filom/ASN1Decoder)

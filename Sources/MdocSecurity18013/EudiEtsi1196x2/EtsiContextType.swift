@@ -25,6 +25,39 @@ public enum EtsiContextType: String, CaseIterable, Identifiable, Sendable {
     case wallet = "Wallet"
     case wrpac = "WRPAC"
     case wrprc = "WRPRC"
+    case qeaa = "QEAA"
+    case pubEaa = "PubEAA"
+    case pidStatus = "PIDStatus"
+    case mdlStatus = "mDLStatus"
+    case qeaaStatus = "QEAAStatus"
+    case pubEaaStatus = "PubEAAStatus"
+    case wrprcStatus = "WRPRCStatus"
+
+    /// Status-signing context for an attestation or registration certificate.
+    /// Access certificates and wallet attestations have no document status mapping here.
+    public var statusContext: Self? {
+        switch self {
+        case .pid, .pidStatus: .pidStatus
+        case .mdl, .mdlStatus: .mdlStatus
+        case .qeaa, .qeaaStatus: .qeaaStatus
+        case .pubEaa, .pubEaaStatus: .pubEaaStatus
+        case .wrprc, .wrprcStatus: .wrprcStatus
+        case .wallet, .wrpac: nil
+        }
+    }
+
+    // The KMP bundled-anchor bridge only exposes issuance contexts. For static anchors,
+    // select the exact status anchors first, then use the corresponding bridge slot.
+    var bundledAnchorContext: Self {
+        switch self {
+        case .pidStatus: .pid
+        case .mdlStatus: .mdl
+        case .qeaaStatus: .qeaa
+        case .pubEaaStatus: .pubEaa
+        case .wrprcStatus: .wrprc
+        default: self
+        }
+    }
 
     public var id: String { rawValue }
 
@@ -35,6 +68,13 @@ public enum EtsiContextType: String, CaseIterable, Identifiable, Sendable {
         case .wrpac:  return VerificationContextWalletRelyingPartyAccessCertificate.shared
         case .wrprc:  return VerificationContextWalletRelyingPartyRegistrationCertificate.shared
         case .mdl: return VerificationContextEAA(useCase: EudiwIosTrust.shared.mdlUseCase)
+        case .qeaa: return VerificationContextQEAA.shared
+        case .pubEaa: return VerificationContextPubEAA.shared
+        case .pidStatus: return VerificationContextPIDStatus.shared
+        case .mdlStatus: return VerificationContextEAAStatus(useCase: EudiwIosTrust.shared.mdlUseCase)
+        case .qeaaStatus: return VerificationContextQEAAStatus.shared
+        case .pubEaaStatus: return VerificationContextPubEAAStatus.shared
+        case .wrprcStatus: return VerificationContextWalletRelyingPartyRegistrationCertificateStatus.shared
         }
     }
 }
@@ -46,10 +86,17 @@ extension EtsiContextType {
     func matches(_ context: any VerificationContext) -> Bool {
         switch self {
         case .pid: return context is VerificationContextPID
-        case .mdl: return context is VerificationContextEAA
+        case .mdl: return (context as? VerificationContextEAA)?.useCase == EudiwIosTrust.shared.mdlUseCase
         case .wallet: return context is VerificationContextWalletProviderAttestation
         case .wrpac: return context is VerificationContextWalletRelyingPartyAccessCertificate
         case .wrprc: return context is VerificationContextWalletRelyingPartyRegistrationCertificate
+        case .qeaa: return context is VerificationContextQEAA
+        case .pubEaa: return context is VerificationContextPubEAA
+        case .pidStatus: return context is VerificationContextPIDStatus
+        case .mdlStatus: return (context as? VerificationContextEAAStatus)?.useCase == EudiwIosTrust.shared.mdlUseCase
+        case .qeaaStatus: return context is VerificationContextQEAAStatus
+        case .pubEaaStatus: return context is VerificationContextPubEAAStatus
+        case .wrprcStatus: return context is VerificationContextWalletRelyingPartyRegistrationCertificateStatus
         }
     }
 }
