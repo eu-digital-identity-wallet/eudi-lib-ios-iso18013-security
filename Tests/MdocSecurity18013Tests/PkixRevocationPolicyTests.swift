@@ -90,11 +90,11 @@ struct PkixRevocationPolicyTests {
         #expect(copiedStatic.crlChecker === checker)
     }
 
-    @Test("Bundled anchors with CRL revocation reject a chain whose certificates publish no CRL")
-    func crlOnlyRejectsChainWithoutCrl() async {
+    @Test("Bundled anchors with CRL revocation reject a chain whose certificates publish no CRL", arguments: [EtsiContextType.wrpac, .pidStatus, .mdlStatus, .qeaaStatus, .pubEaaStatus, .wrprcStatus])
+    func crlOnlyRejectsChainWithoutCrl(context: EtsiContextType) async {
         // The test certificates carry no CRL distribution point, so the CRL checker cannot establish a status.
         let source = TrustSource.staticList(StaticListTrustSource(rootCertificates: [root], revocationPolicy: .crlOnly, crlChecker: UnknownCrlChecker()))
-        let manager = EtsiTrustManager(source: source, defaultVerificationContext: EtsiContextType.wrpac.verificationContext)
+        let manager = EtsiTrustManager(source: source, defaultVerificationContext: context.verificationContext)
         let (isTrusted, _) = await manager.validateCertTrustPath(chain: [leaf])
         #expect(!isTrusted)
     }

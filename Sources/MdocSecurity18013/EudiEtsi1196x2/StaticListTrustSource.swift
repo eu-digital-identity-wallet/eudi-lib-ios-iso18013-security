@@ -116,20 +116,22 @@ public struct StaticListTrustSource: @unchecked Sendable {
     }
 
     private static func anchorsForEveryContext(_ rootCertificates: [Data]) -> [EtsiContextType: [Data]] {
-        [.pid: rootCertificates, .mdl: rootCertificates, .wallet: rootCertificates, .wrpac: rootCertificates, .wrprc: rootCertificates]
+        Dictionary(uniqueKeysWithValues: EtsiContextType.allCases.map { ($0, rootCertificates) })
     }
 
-    /// Builds the `BundledAnchors` payload for `EudiwIosTrust.usingBundledAnchors`.
-    var bundledAnchors: BundledAnchors {
+    /// Selects only this context's anchors; issuance and status anchors remain independent.
+    func bundledAnchors(for context: EtsiContextType) -> BundledAnchors {
         let anchors = BundledAnchors()
-        for (context, certificates) in anchorsPerContext {
-            switch context {
-            case .pid: anchors.pid = certificates
-            case .mdl: anchors.mdl = certificates
-            case .wallet: anchors.wallet = certificates
-            case .wrpac: anchors.wrpac = certificates
-            case .wrprc: anchors.wrprc = certificates
-            }
+        let certificates = anchorsPerContext[context]
+        switch context.bundledAnchorContext {
+        case .pid: anchors.pid = certificates
+        case .mdl: anchors.mdl = certificates
+        case .wallet: anchors.wallet = certificates
+        case .wrpac: anchors.wrpac = certificates
+        case .wrprc: anchors.wrprc = certificates
+        case .qeaa: anchors.qea = certificates
+        case .pubEaa: anchors.pubEaa = certificates
+        default: preconditionFailure("Status contexts must map to a bundled-anchor slot")
         }
         return anchors
     }
