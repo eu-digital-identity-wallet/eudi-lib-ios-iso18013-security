@@ -45,6 +45,10 @@ public final class x5cVerifyJwtOrCwt: @unchecked Sendable {
     /// - Throws: `JWS.JWSError` when the token is malformed, the verifying key is missing, or the
     ///   signature is invalid. Parse and verification failures are propagated from `jose-swift`.
     public static func verify(jws: JWS) throws {
+        // RFC 7518, section 3.6: implementations MUST NOT accept Unsecured JWSs by default.
+        if jws.protectedHeader.algorithm?.rawValue == "none" {
+            throw JWS.JWSError.unsupportedAlgorithm(algorithm: "none")
+        }
         // x5c entries are base64 (standard, not base64url) DER certificates; the leaf is first.
         guard let leafBase64 = jws.protectedHeader.x509CertificateChain?.first,
               let certData = Data(base64Encoded: leafBase64) else {
