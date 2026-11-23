@@ -17,7 +17,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-log.git", from: "1.13.1"),
         .package(url: "https://github.com/apple/swift-certificates.git", .upToNextMajor(from: "1.0.0")),
 		.package(url: "https://github.com/apple/swift-docc-plugin", from: "1.5.0"),
-        .package(url: "https://github.com/beatt83/jose-swift.git", from: "6.0.5"),
+        .package(url: "https://github.com/beatt83/jose-swift.git", from: "6.0.4"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
