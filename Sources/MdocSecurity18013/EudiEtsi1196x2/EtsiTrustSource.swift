@@ -122,7 +122,8 @@ extension EtsiTrustSource {
                 qeaProviders: nil,
                 eaaProviders: [:]
             ),
-            loteSignerTrustAnchors: loteSignerTrustAnchors
+            loteSignerTrustAnchors: loteSignerTrustAnchors,
+            revocationPolicy: .disabled
         )
     }
 }
