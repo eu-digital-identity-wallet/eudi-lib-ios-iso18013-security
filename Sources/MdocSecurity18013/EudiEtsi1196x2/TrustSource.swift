@@ -37,6 +37,7 @@ public enum TrustSource: @unchecked Sendable {
         case .etsi(let source):
             return .etsi(EtsiTrustSource(
                 loteLocations: source.loteLocations,
+                loteSignerTrustAnchors: source.loteSignerTrustAnchors,
                 contextTypeMappings: mappings,
                 cacheTtlHours: source.cacheTtlHours,
                 customJwtSignatureVerifier: source.customJwtSignatureVerifier,

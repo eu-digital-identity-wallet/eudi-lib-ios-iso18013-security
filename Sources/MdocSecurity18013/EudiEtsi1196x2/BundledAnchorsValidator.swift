@@ -23,7 +23,12 @@ import EudiEtsi1196x2
 /// PKIX path validation with the anchors as the only trusted roots (`.pkix`), or leaf
 /// pinning against the exact anchor certificates (`.directTrust`).
 enum BundledAnchorsValidator {
-    static func validate(chain: [Data], anchors: [Data], method: BundledAnchorMethod) -> IosValidationResult {
+    static func validate(
+        chain: [Data],
+        anchors: [Data],
+        method: BundledAnchorMethod,
+        disableNetworkFetch: Bool = false
+    ) -> IosValidationResult {
         guard let leaf = chain.first else {
             return IosValidationResult(isTrusted: false, matchedAnchor: nil, failureReason: "Certificate chain is empty")
         }
@@ -42,7 +47,8 @@ enum BundledAnchorsValidator {
         guard SecTrustCreateWithCertificates(certs as CFArray, SecPolicyCreateBasicX509(), &trust) == errSecSuccess,
               let secTrust = trust,
               SecTrustSetAnchorCertificates(secTrust, anchorCerts as CFArray) == errSecSuccess,
-              SecTrustSetAnchorCertificatesOnly(secTrust, true) == errSecSuccess else {
+              SecTrustSetAnchorCertificatesOnly(secTrust, true) == errSecSuccess,
+              (!disableNetworkFetch || SecTrustSetNetworkFetchAllowed(secTrust, false) == errSecSuccess) else {
             return IosValidationResult(isTrusted: false, matchedAnchor: nil, failureReason: "Trust evaluation could not be set up")
         }
         var cfError: CFError?

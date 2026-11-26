@@ -28,8 +28,11 @@ public struct EtsiTrustSource: @unchecked Sendable {
     public let loteLocations: SupportedLists<NSString>
     // verification context mappings (doc type to etsi context)
     public let contextTypeMappings: EtsiContextTypeMappings?
-    /// Optional custom JWT signature verifier for LoTE JWTs; when `nil`, the core uses
-    /// its built-in verifier.
+    /// DER certificates that pin a LoTE signer or a CA that issues LoTE signer certificates.
+    /// The built-in verifier rejects all lists when this array is empty.
+    public let loteSignerTrustAnchors: [Data]
+    /// Optional replacement for the built-in LoTE verifier. It must authenticate the
+    /// list operator and verify the JWT signature. Pass an empty anchor array when it manages its own trust.
     public let customJwtSignatureVerifier: (any VerifyJwtSignature)?
     /// Optional custom LoTE loader; when `nil`, the core fetches each LoTE with the built-in
     /// downloader. Use it to fetch LoTEs through your own HTTP stack or to serve locally
@@ -57,6 +60,7 @@ public struct EtsiTrustSource: @unchecked Sendable {
 
     public init(
         loteLocations: SupportedLists<NSString>,
+        loteSignerTrustAnchors: [Data],
         contextTypeMappings: EtsiContextTypeMappings? = nil,
         cacheTtlHours: TimeInterval = EtsiTrustSource.defaultCacheTtlHours,
         customJwtSignatureVerifier: (any VerifyJwtSignature)? = nil,
@@ -66,6 +70,7 @@ public struct EtsiTrustSource: @unchecked Sendable {
         crlChecker: (any CheckRevocationIos)? = nil
     ) {
         self.loteLocations = loteLocations
+        self.loteSignerTrustAnchors = loteSignerTrustAnchors
         self.contextTypeMappings = contextTypeMappings
         self.cacheTtlHours = cacheTtlHours
         self.customJwtSignatureVerifier = customJwtSignatureVerifier
@@ -77,9 +82,10 @@ public struct EtsiTrustSource: @unchecked Sendable {
 
     /// Creates a source from the legacy revocation flag: `true` checks revocation with OCSP only
     /// (`.ocspOnly`), `false` disables it (`.disabled`).
-    @available(*, deprecated, message: "Use init(loteLocations:contextTypeMappings:cacheTtlHours:customJwtSignatureVerifier:loadLoTE:loteConstraints:revocationPolicy:) instead")
+    @available(*, deprecated, message: "Use init(loteLocations:loteSignerTrustAnchors:contextTypeMappings:cacheTtlHours:customJwtSignatureVerifier:loadLoTE:loteConstraints:revocationPolicy:) instead")
     public init(
         loteLocations: SupportedLists<NSString>,
+        loteSignerTrustAnchors: [Data],
         contextTypeMappings: EtsiContextTypeMappings? = nil,
         cacheTtlHours: TimeInterval = EtsiTrustSource.defaultCacheTtlHours,
         customJwtSignatureVerifier: (any VerifyJwtSignature)? = nil,
@@ -89,6 +95,7 @@ public struct EtsiTrustSource: @unchecked Sendable {
     ) {
         self.init(
             loteLocations: loteLocations,
+            loteSignerTrustAnchors: loteSignerTrustAnchors,
             contextTypeMappings: contextTypeMappings,
             cacheTtlHours: cacheTtlHours,
             customJwtSignatureVerifier: customJwtSignatureVerifier,
@@ -103,17 +110,22 @@ public struct EtsiTrustSource: @unchecked Sendable {
 
 extension EtsiTrustSource {
 
-    /// LoTE trust lists for the EUDI Wallet Reference Implementation environment
-    /// (PID, Wallet, WRPAC, WRPRC; no mDL list is published there).
-    ///
-    /// certificate a reader presents. Build `EtsiTrustConfig` directly to target another context.
-    public static var eudiRef: Self {Self(loteLocations: SupportedLists<NSString>(
+    /// LoTE trust lists and signer CA for the EUDI Wallet Reference Implementation.
+    public static var eudiRef: Self {
+        // The same development CA as the Android reference wallet, provisioned with the package.
+        let anchor = Bundle.module.url(forResource: "pidissuerca02_eu", withExtension: "der")
+            .flatMap { try? Data(contentsOf: $0) }
+        return Self(
+            loteLocations: SupportedLists<NSString>(
                 pidProviders: EUDIRefImplLists.pidProviders as NSString,
                 walletProviders: EUDIRefImplLists.walletProviders as NSString,
                 wrpacProviders: EUDIRefImplLists.wrpacProviders as NSString,
                 wrprcProviders: EUDIRefImplLists.wrprcProviders as NSString,
                 pubEaaProviders: EUDIRefImplLists.pubEaaProviders as NSString,
-                qeaProviders: nil, eaaProviders: [:])
+                qeaProviders: nil,
+                eaaProviders: [:]
+            ),
+            loteSignerTrustAnchors: anchor.map { [$0] } ?? []
         )
     }
 }

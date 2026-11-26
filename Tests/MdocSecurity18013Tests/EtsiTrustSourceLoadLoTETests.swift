@@ -15,7 +15,10 @@ limitations under the License.
 */
 
 #if canImport(EudiEtsi1196x2)
+import CryptoKit
 import Foundation
+import SwiftASN1
+import X509
 import Testing
 import EudiEtsi1196x2
 
@@ -47,6 +50,63 @@ struct EtsiTrustSourceLoadLoTETests {
         #expect(loader.requestedUris == [mdlUrl])
     }
 
+    @Test("The default verifier authenticates the signer of lists returned by the custom loader",
+          arguments: ["CA", "leaf", "unrelated CA", "empty", "altered signature", "expired leaf"])
+    func defaultVerifier(anchor: String) async throws {
+        let signingKey = P256.Signing.PrivateKey()
+        let caKey = P256.Signing.PrivateKey()
+        let ca = try X509.DistinguishedName { CommonName("LoTE test CA") }
+        let signer = try X509.DistinguishedName { CommonName("LoTE test signer") }
+        let caCertificate = try makeCertificate(subject: ca, issuer: ca, key: caKey, issuerKey: caKey, isCA: true)
+        let signerCertificate = try makeCertificate(
+            subject: signer, issuer: ca, key: signingKey, issuerKey: caKey, expired: anchor == "expired leaf"
+        )
+        let header = try JSONSerialization.data(withJSONObject: [
+            "alg": "ES256", "x5c": [signerCertificate.base64EncodedString()]
+        ])
+        let payload = Self.mdlLoTEPayload(certificate: root)
+        let input = "\(header.base64URLEncoded).\(payload.base64URLEncoded)"
+        var signature = try signingKey.signature(for: Data(input.utf8)).rawRepresentation
+        if anchor == "altered signature" { signature[0] ^= 1 }
+        let loader = RecordingLoadLoTE(jwt: "\(input).\(signature.base64URLEncoded)")
+        let anchors: [Data]
+        switch anchor {
+        case "leaf", "expired leaf": anchors = [signerCertificate]
+        case "unrelated CA": anchors = [root]
+        case "empty": anchors = []
+        default: anchors = [caCertificate]
+        }
+        let config = makeSource(loader: loader, signerTrustAnchors: anchors, verifier: nil)
+        let manager = EtsiTrustManager(
+            source: TrustSource.etsi(config).withContextTypeMappings(nil),
+            defaultVerificationContext: EtsiContextType.mdl.verificationContext
+        )
+
+        let (trusted, reason) = await manager.validateCertTrustPath(chain: [leaf])
+        #expect(trusted == (anchor == "CA" || anchor == "leaf"), "reason: \(reason ?? "nil")")
+        #expect(loader.requestedUris == [mdlUrl])
+    }
+
+    private func makeCertificate(
+        subject: X509.DistinguishedName, issuer: X509.DistinguishedName, key: P256.Signing.PrivateKey,
+        issuerKey: P256.Signing.PrivateKey, isCA: Bool = false, expired: Bool = false
+    ) throws -> Data {
+        let now = Date()
+        let extensions = try Certificate.Extensions {
+            Critical(isCA ? BasicConstraints.isCertificateAuthority(maxPathLength: nil) : .notCertificateAuthority)
+            Critical(KeyUsage(digitalSignature: !isCA, keyCertSign: isCA))
+        }
+        let certificate = try Certificate(
+            version: .v3, serialNumber: isCA ? 1 : 2, publicKey: .init(key.publicKey),
+            notValidBefore: now.addingTimeInterval(-3600), notValidAfter: now.addingTimeInterval(expired ? -60 : 3600),
+            issuer: issuer, subject: subject, signatureAlgorithm: .ecdsaWithSHA256,
+            extensions: extensions, issuerPrivateKey: .init(issuerKey)
+        )
+        var serializer = DER.Serializer()
+        try serializer.serialize(certificate)
+        return Data(serializer.serializedBytes)
+    }
+
     @Test("A list the loader cannot provide yields an untrusted result without network access")
     func missingListIsNotTrusted() async {
         let loader = RecordingLoadLoTE(jwt: nil)
@@ -70,7 +130,10 @@ struct EtsiTrustSourceLoadLoTETests {
         #expect(etsi.loadLoTE as AnyObject === loader)
     }
 
-    private func makeSource(loader: RecordingLoadLoTE) -> EtsiTrustSource {
+    private func makeSource(
+        loader: RecordingLoadLoTE, signerTrustAnchors: [Data] = [],
+        verifier: (any VerifyJwtSignature)? = AcceptAllJwtSignature()
+    ) -> EtsiTrustSource {
         let lists = SupportedLists<NSString>(
             pidProviders: nil,
             walletProviders: nil,
@@ -82,7 +145,8 @@ struct EtsiTrustSourceLoadLoTETests {
         )
         return EtsiTrustSource(
             loteLocations: lists,
-            customJwtSignatureVerifier: AcceptAllJwtSignature(),
+            loteSignerTrustAnchors: signerTrustAnchors,
+            customJwtSignatureVerifier: verifier,
             loadLoTE: loader,
             revocationPolicy: .disabled
         )
@@ -97,6 +161,12 @@ struct EtsiTrustSourceLoadLoTETests {
 
     /// An unsigned mDL providers LoTE whose single issuance service lists `certificate`.
     private static func mdlLoTEJwt(certificate: Data) -> String {
+        let header = Data(#"{"alg":"none"}"#.utf8)
+        let payload = mdlLoTEPayload(certificate: certificate)
+        return "\(header.base64URLEncoded).\(payload.base64URLEncoded).signature"
+    }
+
+    private static func mdlLoTEPayload(certificate: Data) -> Data {
         let now = Date()
         let formatter = ISO8601DateFormatter()
         let lote: [String: Any] = [
@@ -128,9 +198,7 @@ struct EtsiTrustSourceLoadLoTETests {
                 ]],
             ],
         ]
-        let header = Data(#"{"alg":"none"}"#.utf8)
-        let payload = (try? JSONSerialization.data(withJSONObject: lote)) ?? Data()
-        return "\(header.base64URLEncoded).\(payload.base64URLEncoded).signature"
+        return (try? JSONSerialization.data(withJSONObject: lote)) ?? Data()
     }
 }
 
