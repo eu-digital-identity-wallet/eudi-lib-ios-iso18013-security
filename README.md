@@ -60,6 +60,14 @@ guard let readerAuthRawCBOR = docR.readerAuthRawCBOR else { continue }
 let b = try await mdocAuth.validateReaderAuth(readerAuthCBOR: readerAuthRawCBOR, readerAuthX5c: docR.readerCertificates, itemsRequestRawData: docR.itemsRequestRawData!)
 ```
 
+## ETSI list signer trust
+
+Construct `EtsiTrustSource` with `loteSignerTrustAnchors` containing DER certificates for the permitted LoTE signers or their issuing CAs. The built-in verifier checks the signing certificate's validity, requires an exact signer pin or a certificate path to a configured anchor, and then verifies the JWT signature. This applies to lists returned by a custom `loadLoTE` as well as the built-in downloader.
+
+The signer path is evaluated offline. The `revocationPolicy` on the source applies to the credential and verifier certificate chains evaluated using the loaded lists. A custom `customJwtSignatureVerifier` may supply its own signer trust policy and use an empty anchor array. With the built-in verifier, empty anchors reject every list.
+
+For the EUDI Wallet Reference Implementation list URLs, pass your DER signer trust anchors to `EtsiTrustSource.eudiRef(loteSignerTrustAnchors:)`.
+
 ## ETSI status-list trust
 
 On iOS, select the status-signing context for the credential or registration certificate being checked:

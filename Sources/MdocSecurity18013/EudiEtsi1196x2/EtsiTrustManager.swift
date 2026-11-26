@@ -18,7 +18,6 @@ limitations under the License.
 import Foundation
 import Security
 import EudiEtsi1196x2
-import JSONWebSignature
 
 public final class EtsiTrustManager: @unchecked Sendable {
     // Type-erased validation over the selected trust source; returns `nil` if validation throws
@@ -37,7 +36,7 @@ public final class EtsiTrustManager: @unchecked Sendable {
     ///
     /// - source: Trust source
     /// - `.etsi`: a cached LoTE validator via `EudiwIosTrust.cached(urls:ttlHours:verifyJwtSignature:directTrust:pkix:)`,
-    ///   which honors `loteLocations`, `cacheTtl`, and `customJwtSignatureVerifier`. When `loadLoTE` is set,
+    ///   which authenticates LoTE signers against `loteSignerTrustAnchors` by default. When `loadLoTE` is set,
     ///   the `EudiwIosTrust.cached(urls:ttlHours:verifyJwtSignature:loadLoTE:directTrust:pkix:)` overload is used
     ///   so each LoTE is obtained from that loader instead of the built-in downloader. The PKIX validator
     ///   checks revocation according to `revocationPolicy`.
@@ -62,7 +61,8 @@ public final class EtsiTrustManager: @unchecked Sendable {
             urls.qeaProviders = lists.qeaProviders as String?
             urls.mdlProviders = lists.eaaProviders[EudiwIosTrust.shared.mdlUseCase] as String?
 
-            let verifyJwtSignature: VerifyJwtSignature = etsi.customJwtSignatureVerifier ?? x5cVerifyJwtOrCwt.shared
+            let verifyJwtSignature: any VerifyJwtSignature = etsi.customJwtSignatureVerifier
+                ?? LoteJwtVerifier(signerTrustAnchors: etsi.loteSignerTrustAnchors)
             let directTrust = ValidateCertificateChainUsingDirectTrustIosKt.ValidateCertificateChainUsingDirectTrustIos
             let pkix = etsi.revocationPolicy.pkixValidator(crlChecker: etsi.crlChecker)
             let validator = if let loadLoTE = etsi.loadLoTE {
@@ -189,13 +189,4 @@ extension EtsiTrustManager: CertificateTrustValidator {
     }
 }
 
-extension x5cVerifyJwtOrCwt: VerifyJwtSignature {
-    public func invoke(jwt: String) async throws -> any VerifyJwtSignatureOutcome {
-        let jws = try JWS(jwsString: jwt)
-        try Self.verify(jws: jws)
-        return VerifyJwtSignatureOutcomeVerified(jwt: jwt)
-    }
-}
-
 #endif
-

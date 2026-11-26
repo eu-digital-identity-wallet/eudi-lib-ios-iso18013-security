@@ -21,17 +21,8 @@ import Security
 import JSONWebSignature
 import SwiftCBOR
 
-/// A ``VerifyJwtSignature`` implementation that verifies a LoTE JWS using the X.509
-/// certificate chain embedded in its `x5c` protected header (RFC 7515 §4.1.6).
-///
-/// The JWS signature is validated against the public key of the leaf certificate
-/// (`x5c[0]`) using the algorithm declared in the `alg` header. Both ECDSA
-/// (`ES256` / `ES384` / `ES512`) and RSASSA-PKCS1-v1_5 (`RS256` / `RS384` / `RS512`)
-/// algorithms are supported, matching the signature schemes used by the EUDI trust lists.
-///
-/// This performs the cryptographic signature check only; anchoring the `x5c` chain to a
-/// trusted scheme operator is handled by the certificate-profile validation of the
-/// surrounding trust pipeline.
+/// Signature verification for JWT and CWT tokens carrying a certificate chain.
+/// Use `validateTrust(_:trustValidator:)` to verify both the signature and the chain.
 public final class x5cVerifyJwtOrCwt: @unchecked Sendable {
     public static let shared = x5cVerifyJwtOrCwt()
     nonisolated(unsafe) public static let compactJWSRegex = #/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/#

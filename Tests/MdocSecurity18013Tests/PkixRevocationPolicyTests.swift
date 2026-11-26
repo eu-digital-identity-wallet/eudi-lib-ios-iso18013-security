@@ -53,7 +53,7 @@ struct PkixRevocationPolicyTests {
 
     @Test("New initializers default to OCSP only")
     func defaultsToOcspOnly() {
-        #expect(EtsiTrustSource(loteLocations: Self.emptyLists).revocationPolicy == .ocspOnly)
+        #expect(EtsiTrustSource(loteLocations: Self.emptyLists, loteSignerTrustAnchors: []).revocationPolicy == .ocspOnly)
         #expect(StaticListTrustSource(rootCertificates: [root]).revocationPolicy == .ocspOnly)
         #expect(StaticListTrustSource(anchorsPerContext: [.wrpac: [root]]).revocationPolicy == .ocspOnly)
     }
@@ -76,7 +76,7 @@ struct PkixRevocationPolicyTests {
     func withContextTypeMappingsKeepsPolicy(policy: PkixRevocationPolicy) {
         let mappings: EtsiContextTypeMappings = ["org.iso.18013.5.1.mDL": .mdl]
         let checker = UnknownCrlChecker()
-        let etsi = TrustSource.etsi(EtsiTrustSource(loteLocations: Self.emptyLists, revocationPolicy: policy, crlChecker: checker))
+        let etsi = TrustSource.etsi(EtsiTrustSource(loteLocations: Self.emptyLists, loteSignerTrustAnchors: [], revocationPolicy: policy, crlChecker: checker))
         let staticList = TrustSource.staticList(StaticListTrustSource(rootCertificates: [root], revocationPolicy: policy, crlChecker: checker))
         guard case .etsi(let copiedEtsi) = etsi.withContextTypeMappings(mappings),
               case .staticList(let copiedStatic) = staticList.withContextTypeMappings(mappings) else {
@@ -114,7 +114,7 @@ private struct LegacySources {
     let root: Data
 
     func etsi(_ isRevocationEnabled: Bool) -> EtsiTrustSource {
-        EtsiTrustSource(loteLocations: lists, isRevocationEnabled: isRevocationEnabled)
+        EtsiTrustSource(loteLocations: lists, loteSignerTrustAnchors: [], isRevocationEnabled: isRevocationEnabled)
     }
 
     func staticRoots(_ isRevocationEnabled: Bool) -> StaticListTrustSource {

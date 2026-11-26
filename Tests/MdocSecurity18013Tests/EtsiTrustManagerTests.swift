@@ -23,22 +23,32 @@ import EudiEtsi1196x2
 @testable import MdocSecurity18013
 
 /// Tests for `EtsiTrustManager` using the eudiRef ETSI LoTE source.
-/// These tests download live trust lists and require network access. The bundled
-/// certificate is not known to be trusted by those lists, so the tests check that
-/// the validation pipeline completes, the trust APIs agree, and an untrusted
-/// certificate is rejected.
+/// These tests download live trust lists and require network access. They use
+/// the reference wallet's signer CA to check that the trust APIs agree and reject
+/// an untrusted leaf certificate.
 @Suite("EtsiTrustManager Tests")
 struct EtsiTrustManagerTests {
     /// DER leaf certificate issued by the bundled test root.
     let leaf: Data
+    let signerCA: Data
+
+    private var source: EtsiTrustSource {
+        .eudiRef(loteSignerTrustAnchors: [signerCA])
+    }
 
     init() throws {
         leaf = try Data(contentsOf: #require(Bundle.module.url(forResource: "eudi-test-leaf", withExtension: "der")))
+        signerCA = try Data(contentsOf: #require(Bundle.module.url(forResource: "pidissuerca02_eu", withExtension: "der")))
+    }
+
+    @Test("eudiRef ETSI uses the supplied signer anchors")
+    func eudiRefUsesSuppliedSignerAnchors() {
+        #expect(source.loteSignerTrustAnchors == [signerCA])
     }
 
     @Test("eudiRef ETSI: validation pipeline completes and the two trust APIs agree")
     func eudiRefEtsiCompletes() async {
-        let manager = EtsiTrustManager(source: .etsi(.eudiRef))
+        let manager = EtsiTrustManager(source: .etsi(source))
         let (trusted, reason) = await manager.validateCertTrustPath(chain: [leaf])
         if let reason { print("eudiRef ETSI failure reason: \(reason)") }
         let path = await manager.createCertTrustPath(chain: [leaf])
@@ -47,7 +57,7 @@ struct EtsiTrustManagerTests {
 
     @Test("eudiRef ETSI: an untrusted certificate is not trusted")
     func eudiRefEtsiRejectsUntrusted() async {
-        let manager = EtsiTrustManager(source: .etsi(.eudiRef)) 
+        let manager = EtsiTrustManager(source: .etsi(source))
         let (trusted, reason) = await manager.validateCertTrustPath(chain: [leaf])
         if let reason { print("eudiRef ETSI failure reason: \(reason)") }
         #expect(trusted == false)
