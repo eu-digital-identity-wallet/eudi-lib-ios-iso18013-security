@@ -30,7 +30,6 @@ let package = Package(
                 .target(name: "EudiEtsi1196x2", condition: .when(platforms: [.iOS])),
                 .product(name: "jose-swift", package: "jose-swift", condition: .when(platforms: [.iOS, .macOS])),
             ],
-            resources: [.copy("Resources/pidissuerca02_eu.der")],
             swiftSettings: [
                 .enableUpcomingFeature("InferIsolatedConformances"),
                 .enableUpcomingFeature("NonisolatedNonsendingByDefault")

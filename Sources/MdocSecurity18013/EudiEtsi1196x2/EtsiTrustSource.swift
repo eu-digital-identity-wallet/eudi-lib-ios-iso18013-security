@@ -110,12 +110,9 @@ public struct EtsiTrustSource: @unchecked Sendable {
 
 extension EtsiTrustSource {
 
-    /// LoTE trust lists and signer CA for the EUDI Wallet Reference Implementation.
-    public static var eudiRef: Self {
-        // The same development CA as the Android reference wallet, provisioned with the package.
-        let anchor = Bundle.module.url(forResource: "pidissuerca02_eu", withExtension: "der")
-            .flatMap { try? Data(contentsOf: $0) }
-        return Self(
+    /// LoTE trust lists for the EUDI Wallet Reference Implementation with caller-supplied DER signer trust anchors.
+    public static func eudiRef(loteSignerTrustAnchors: [Data]) -> Self {
+        Self(
             loteLocations: SupportedLists<NSString>(
                 pidProviders: EUDIRefImplLists.pidProviders as NSString,
                 walletProviders: EUDIRefImplLists.walletProviders as NSString,
@@ -125,7 +122,7 @@ extension EtsiTrustSource {
                 qeaProviders: nil,
                 eaaProviders: [:]
             ),
-            loteSignerTrustAnchors: anchor.map { [$0] } ?? []
+            loteSignerTrustAnchors: loteSignerTrustAnchors
         )
     }
 }
