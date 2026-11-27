@@ -17,6 +17,7 @@ limitations under the License.
 import Foundation
 import CryptoKit
 @preconcurrency import LocalAuthentication
+import Security
 import MdocDataModel18013
 
 /// Secure Enclave secure area
@@ -43,13 +44,20 @@ public actor SecureEnclaveSecureArea: SecureArea {
         if let keyOptions, keyOptions.curve != Self.defaultEcCurve { throw SecureAreaError("Unsupported curve \(keyOptions.curve)") }
         let batchSize = credentialOptions.batchSize
         if batchSize <= 0 { throw SecureAreaError("Batch size must be greater than 0") }
+        let protection = keyOptions?.accessProtection?.constant ?? kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly
+        let accessControlFlags = (keyOptions?.accessControl?.flags ?? [.userPresence]).union(.privateKeyUsage)
+        var error: Unmanaged<CFError>?
+        guard let accessControl = SecAccessControlCreateWithFlags(nil, protection, accessControlFlags, &error) else {
+            if let error = error?.takeRetainedValue() { throw error }
+            throw SecureAreaError("Failed to create Secure Enclave key access control")
+        }
         var publicKeys: [CoseKey] = []
         publicKeys.reserveCapacity(batchSize)
         var privateKeyRecords = [[String: Data]]()
         privateKeyRecords.reserveCapacity(batchSize)
         // create extra keys and save them as a batch with indexes from 1 to batch-size
         for _ in 0..<batchSize {
-            let key = try SecureEnclave.P256.KeyAgreement.PrivateKey(accessControl: SecAccessControlCreateWithFlags(nil, kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly, [], nil)!)
+            let key = try SecureEnclave.P256.KeyAgreement.PrivateKey(accessControl: accessControl)
             privateKeyRecords.append([kSecValueData as String: key.dataRepresentation])
             publicKeys.append(CoseKey(crv: .P256, x963Representation: key.publicKey.x963Representation))
         }
